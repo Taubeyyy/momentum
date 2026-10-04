@@ -21,6 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build-Nummer (neues Repo seit Build 66 → Lauf + 100)
+        run: echo "BUILD=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
+
       - name: Werkzeuge
         run: brew install xcodegen ldid
 
@@ -40,8 +43,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            MARKETING_VERSION=0.1.${{ github.run_number }} \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=0.1.${{ env.BUILD }} \
+            CURRENT_PROJECT_VERSION=${{ env.BUILD }} \
             build 2>&1 | tee "$RUNNER_TEMP/build.log"
 
       - name: Mit ldid signieren + IPA packen
@@ -59,15 +62,15 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Dopa-${{ github.run_number }}
+          name: Dopa-${{ env.BUILD }}
           path: ios/out/Dopa.ipa
 
       - name: Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "build-${{ github.run_number }}" out/Dopa.ipa \
-            --title "Dopa Build ${{ github.run_number }}" \
+          gh release create "build-${{ env.BUILD }}" out/Dopa.ipa \
+            --title "Dopa Build ${{ env.BUILD }}" \
             --notes "Commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)"
 
       - name: Update auf den Dopa-Server legen (App zeigt „Neue Version“ mit Direkt-Installieren)
@@ -76,7 +79,7 @@ jobs:
         run: |
           if [ -z "$RELEASE_SECRET" ]; then echo "kein Secret – übersprungen"; exit 0; fi
           NOTES=$(git log -1 --pretty=%s | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()[:200]))')
-          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ github.run_number }}" \
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ env.BUILD }}" \
             -H "X-Release-Secret: $RELEASE_SECRET" -H "X-Release-Notes: $NOTES" \
             -H "Content-Type: application/octet-stream" --data-binary @out/Dopa.ipa
 
@@ -88,7 +91,7 @@ jobs:
           python3 ../tools/ipa-check.py out/Dopa.ipa > "$RUNNER_TEMP/ipa.txt" 2>&1 || true
           cat "$RUNNER_TEMP/ipa.txt"
           [ -z "$RELEASE_SECRET" ] && exit 0
-          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=ipa&ok=1" \
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ env.BUILD }}&job=ipa&ok=1" \
             -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ipa.txt" || true
 
       - name: Fehlerprotokoll auf den Dopa-Server (für Claude auf dem Server)
@@ -97,10 +100,10 @@ jobs:
           RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
         run: |
           [ -z "$RELEASE_SECRET" ] && exit 0
-          { echo "Build ${{ github.run_number }} – Commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)"; echo;
+          { echo "Build ${{ env.BUILD }} – Commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)"; echo;
             grep -E "error:|✗|fehlgeschlagen|\*\* BUILD FAILED" "$RUNNER_TEMP/build.log" | head -150; echo; echo "--- Ende des Protokolls ---";
             tail -120 "$RUNNER_TEMP/build.log"; } > "$RUNNER_TEMP/ci.txt" 2>/dev/null || true
-          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=build&ok=0" \
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ env.BUILD }}&job=build&ok=0" \
             -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ci.txt"
 
   # Zweite App aus demselben Repo: die Claude-App (läuft parallel zu Dopa)
@@ -112,6 +115,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build-Nummer (neues Repo seit Build 66 → Lauf + 100)
+        run: echo "BUILD=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
+
       - name: Werkzeuge
         run: brew install xcodegen ldid
 
@@ -120,7 +126,7 @@ jobs:
 
       - name: Claude-App bauen (unsigniert)
         run: |
-          xcodebuild -project Dopa.xcodeproj -scheme ClaudeRemote             -configuration Release -sdk iphoneos             -destination 'generic/platform=iOS'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""             MARKETING_VERSION=0.1.${{ github.run_number }}             CURRENT_PROJECT_VERSION=${{ github.run_number }}             build > "$RUNNER_TEMP/claude.log" 2>&1 || { grep -E "error:" "$RUNNER_TEMP/claude.log" | head -80; tail -40 "$RUNNER_TEMP/claude.log"; exit 1; }
+          xcodebuild -project Dopa.xcodeproj -scheme ClaudeRemote             -configuration Release -sdk iphoneos             -destination 'generic/platform=iOS'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""             MARKETING_VERSION=0.1.${{ env.BUILD }}             CURRENT_PROJECT_VERSION=${{ env.BUILD }}             build > "$RUNNER_TEMP/claude.log" 2>&1 || { grep -E "error:" "$RUNNER_TEMP/claude.log" | head -80; tail -40 "$RUNNER_TEMP/claude.log"; exit 1; }
           tail -3 "$RUNNER_TEMP/claude.log"
 
       - name: Mit ldid signieren + IPA packen
@@ -134,7 +140,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Claude-${{ github.run_number }}
+          name: Claude-${{ env.BUILD }}
           path: ios/out/Claude.ipa
 
       - name: Update auf den Server legen (Claude-App zeigt „Build N ist da“)
@@ -143,7 +149,7 @@ jobs:
         run: |
           if [ -z "$RELEASE_SECRET" ]; then echo "kein Secret – übersprungen"; exit 0; fi
           NOTES=$(git log -1 --pretty=%s | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()[:200]))')
-          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ github.run_number }}&app=claude"             -H "X-Release-Secret: $RELEASE_SECRET" -H "X-Release-Notes: $NOTES"             -H "Content-Type: application/octet-stream" --data-binary @out/Claude.ipa
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ env.BUILD }}&app=claude"             -H "X-Release-Secret: $RELEASE_SECRET" -H "X-Release-Notes: $NOTES"             -H "Content-Type: application/octet-stream" --data-binary @out/Claude.ipa
 
   # Tippt die App im Simulator durch und macht Fotos von jedem Bildschirm (für Claude zum Nachsehen)
   ui:
@@ -153,6 +159,9 @@ jobs:
         working-directory: ios
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build-Nummer (neues Repo seit Build 66 → Lauf + 100)
+        run: echo "BUILD=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
 
       - name: Werkzeuge
         run: brew install xcodegen
@@ -178,11 +187,11 @@ jobs:
         run: |
           [ -z "$RELEASE_SECRET" ] && exit 0
           { grep -E "error:|XCTAssert|failed|passed \(|Test Case" "$RUNNER_TEMP/ui.log" | head -80; } > "$RUNNER_TEMP/ui.txt" 2>/dev/null || true
-          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=ui&ok=$OK" \
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ env.BUILD }}&job=ui&ok=$OK" \
             -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ui.txt"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Screens-${{ github.run_number }}
+          name: Screens-${{ env.BUILD }}
           path: ${{ runner.temp }}/shots
