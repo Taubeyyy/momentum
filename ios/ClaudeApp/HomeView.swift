@@ -247,10 +247,7 @@ private struct UpdateRow: View {
 
     var body: some View {
         Button {
-            let encoded = url.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? url
-            if let trollstore = URL(string: "apple-magnifier://install?url=\(encoded)") {
-                UIApplication.shared.open(trollstore)
-            }
+            installWithTrollStore(url)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "arrow.down.circle.fill").font(.title2).foregroundStyle(Theme.accent)

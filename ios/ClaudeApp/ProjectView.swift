@@ -111,6 +111,13 @@ struct ProjectView: View {
                             }
                         }
                     }
+                    if let install = project?.install {
+                        Button {
+                            installWithTrollStore(install)
+                        } label: {
+                            Label("Build \(build.run) auf dem iPhone installieren", systemImage: "arrow.down.circle.fill")
+                        }
+                    }
                     if let ui = project?.ci.ui, ui.run == build.run {
                         Label(ui.ok ? "Simulator-Rundgang ok" : "Simulator-Rundgang rot",
                               systemImage: ui.ok ? "iphone" : "iphone.slash")

@@ -18,6 +18,17 @@ module.exports = function hub(app, { db, auth, express, str, clamp, RELEASE_DIR 
     dopa: { label: 'Dopa', repo: 'Taubeyyy/momentum', ciDir: RELEASE_DIR, ownFeedback: true },
     fakester: { label: 'Fakester', repo: 'Taubeyyy/fakester-ios', ciDir: path.join(RELEASE_DIR, 'fakester') },
   };
+  // Wo die neueste .ipa liegt (für „Installieren“ in der Claude-App, per TrollStore)
+  function installUrl(project, build) {
+    if (!build || !build.ok) return null;
+    if (project === 'dopa') {
+      const token = process.env.DOPA_DL_TOKEN;
+      const host = process.env.PUBLIC_HOST || 'dopa.taubey.com';
+      return token && fs.existsSync(path.join(RELEASE_DIR, `Dopa-${build.run}.ipa`)) ? `https://${host}/dl/${token}/Dopa-${build.run}.ipa` : null;
+    }
+    // öffentliche Repos: die .ipa hängt am GitHub-Release build-<N>
+    return `https://github.com/${PROJECTS[project].repo}/releases/download/build-${build.run}/Fakester.ipa`;
+  }
   const projectOf = id => (Object.prototype.hasOwnProperty.call(PROJECTS, id) ? PROJECTS[id] : null);
 
   db.exec(`CREATE TABLE IF NOT EXISTS app_feedback (
@@ -335,6 +346,7 @@ module.exports = function hub(app, { db, auth, express, str, clamp, RELEASE_DIR 
         id, label: p.label, repo: p.repo,
         open: feedbackList(id).length,
         ci: ciState(id),
+        install: installUrl(id, ciState(id).build),
         job: jobRef(lastJob(id)),
       })),
     });

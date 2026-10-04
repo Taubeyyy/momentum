@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Verbindung zur Werkbank auf dopa.taubey.com (hub.js). Anmeldung mit dem Dopa-Konto des Besitzers.
 @MainActor
@@ -125,6 +126,7 @@ struct Project: Decodable, Identifiable, Hashable {
     let repo: String
     let open: Int
     let ci: CI
+    let install: String?        // neueste .ipa (für TrollStore)
     let job: JobRef?
 
     static func == (a: Project, b: Project) -> Bool { a.id == b.id }
@@ -182,3 +184,12 @@ struct Job: Decodable {
 }
 
 struct Release: Decodable { let build: Int; let notes: String; let url: String? }
+
+/// .ipa per TrollStore installieren (apple-magnifier://install?url=…).
+@MainActor
+func installWithTrollStore(_ url: String) {
+    let encoded = url.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? url
+    if let troll = URL(string: "apple-magnifier://install?url=\(encoded)") {
+        UIApplication.shared.open(troll)
+    }
+}

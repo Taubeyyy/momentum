@@ -318,6 +318,7 @@ function check(name, cond, extra) {
   const fk2 = ov2.body.projects.find(p => p.id === 'fakester');
   check('Fakester-CI meldet sich per OIDC', ciOk.status === 200 && fk2.ci.build?.run === 9 && fk2.ci.build.ok && fk2.ci.build.notes === 'Lobby repariert', JSON.stringify(fk2.ci));
   check('Fremdes Repo darf nicht melden', ciWrong.status === 403);
+  check('Fakester-Build ist installierbar', fk2.install === 'https://github.com/Taubeyyy/fakester-ios/releases/download/build-9/Fakester.ipa', fk2.install);
   const upClaude = await fetch(BASE + '/api/dopa/release?build=41&app=claude', { method: 'PUT', body: Buffer.alloc(120_000, 1),
     headers: { 'X-Release-Secret': 'geheim', 'Content-Type': 'application/octet-stream' } });
   const latestClaude = await (await fetch(BASE + '/api/dopa/latest?app=claude')).json();
