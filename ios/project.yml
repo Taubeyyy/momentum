@@ -1,0 +1,93 @@
+# XcodeGen-Projektbeschreibung — daraus erzeugt der Mac-Runner Dopa.xcodeproj.
+# Kein Xcode auf Windows nötig; siehe .github/workflows/ios.yml
+name: Dopa
+options:
+  bundleIdPrefix: com.taubey
+  developmentLanguage: de   # System-Texte (Suchen, Löschen …) auf Deutsch
+  deploymentTarget:
+    iOS: "16.2"            # ActivityContent-API; Zielgerät läuft auf 16.4.1
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"     # CI setzt 0.1.<Build-Nummer>
+    CURRENT_PROJECT_VERSION: "1"   # CI überschreibt mit der Build-Nummer
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+targets:
+  Dopa:
+    type: application
+    platform: iOS
+    sources: [Dopa, Shared]
+    dependencies:
+      - target: DopaWidget
+    info:
+      path: Dopa/Info.plist
+      properties:
+        CFBundleDisplayName: Dopa
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: de
+        CFBundleAllowMixedLocalizations: true
+        UILaunchScreen: {}
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.taubey.dopa.backup]
+        NSMicrophoneUsageDescription: Für den Audio-Dump – du erzählst, Dopa macht daraus einen Plan.
+        NSSpeechRecognitionUsageDescription: Damit Dopa versteht, was du im Audio-Dump erzählst.
+        NSCameraUsageDescription: Damit du Fotos in Notizen ablegen kannst, zum Beispiel wo der Schlüssel liegt.
+        NSCalendarsUsageDescription: Damit Dopa deine Termine im Tag zeigt und dich rechtzeitig zum Losgehen erinnert. Dopa liest nur.
+        NSCalendarsFullAccessUsageDescription: Damit Dopa deine Termine im Tag zeigt und dich rechtzeitig zum Losgehen erinnert. Dopa liest nur.
+        NSLocationWhenInUseUsageDescription: Damit Dopa dich erinnert, wenn du an einem deiner Orte ankommst (z. B. zu Hause oder beim Laden). iOS meldet nur das Ankommen – Dopa verfolgt dich nicht.
+        NSHealthShareUsageDescription: Dopa liest Schlaf und Schritte von deiner Apple Watch – nach kurzen Nächten wird der Tag sanfter, Schritte haken Gewohnheiten ab. Bleibt auf dem Handy.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.taubey.dopa
+            CFBundleURLSchemes: [dopa]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.taubey.dopa
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Dopa/Dopa.entitlements
+  DopaWidget:
+    type: app-extension
+    platform: iOS
+    sources: [DopaWidget, Shared]
+    info:
+      path: DopaWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Dopa
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.taubey.dopa.widget
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: DopaWidget/DopaWidget.entitlements
+  DopaUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Dopa
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.taubey.dopa.uitests
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Dopa:
+    build:
+      targets:
+        Dopa: all
+    test:
+      targets:
+        - DopaUITests

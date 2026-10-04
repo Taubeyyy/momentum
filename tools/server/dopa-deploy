@@ -1,0 +1,85 @@
+#!/bin/bash
+# Spielt den Dopa-Server aus /home/claude/momentum nach /var/www/momentum.
+# Liegt als root-eigene Kopie in /usr/local/bin – der Benutzer „claude" darf es nur per sudo starten, nicht ändern.
+#   sudo dopa-deploy              Tests → Sicherung → kopieren → pm2 neu starten → Gesundheitscheck
+#   sudo dopa-deploy --rollback   letzte Sicherung zurückspielen
+set -euo pipefail
+export PM2_HOME=/root/.pm2
+SRC=/home/claude/momentum
+DST=/var/www/momentum
+BK=/root/backups/dopa-deploy
+LOG=/var/log/dopa-deploy.log
+# ohne Schrägstrich am Ende – gilt so für rsync und tar
+EXCLUDES=(--exclude=.env --exclude='momentum.db*' --exclude=node_modules --exclude=releases --exclude=ios
+          --exclude=.git --exclude=.github --exclude=.claude --exclude=.deployed-commit)
+
+mkdir -p "$BK"
+exec > >(tee -a "$LOG") 2>&1
+echo "=== $(date '+%F %T') dopa-deploy $*"
+
+lock_sum() { sha256sum "$DST/package-lock.json" 2>/dev/null | cut -d' ' -f1; }
+
+restart_and_check() {
+  pm2 restart momentum --update-env >/dev/null
+  for _ in $(seq 1 15); do
+    sleep 1
+    if curl -fsS -o /dev/null http://127.0.0.1:3065/api/dopa/latest; then echo "Server antwortet."; return 0; fi
+  done
+  echo "Server antwortet nicht. Letzte Log-Zeilen:"
+  pm2 logs momentum --nostream --lines 30 2>&1 | tail -30
+  return 1
+}
+
+rollback() {
+  local last
+  last=$(ls -1t "$BK"/*.tgz 2>/dev/null | head -1 || true)
+  [ -n "$last" ] || { echo "Keine Sicherung gefunden."; exit 1; }
+  echo "Spiele Sicherung zurück: $last"
+  local tmp; tmp=$(mktemp -d)
+  tar -xzf "$last" -C "$tmp"
+  local before; before=$(lock_sum)
+  rsync -rlt --delete "${EXCLUDES[@]}" "$tmp"/ "$DST"/
+  rm -rf "$tmp"
+  [ "$before" = "$(lock_sum)" ] || (cd "$DST" && npm install --omit=dev --no-audit --no-fund)
+  restart_and_check
+}
+
+if [ "${1:-}" = "--rollback" ]; then
+  rollback
+  exit $?
+fi
+
+cd "$SRC"
+if [ -n "$(sudo -u claude git -C "$SRC" status --porcelain)" ]; then
+  echo "Abbruch: Es gibt nicht committete Änderungen in $SRC. Erst committen (und pushen), dann deployen."
+  exit 1
+fi
+COMMIT=$(sudo -u claude git -C "$SRC" rev-parse --short HEAD)
+
+echo "Tests …"
+if ! sudo -u claude -H bash -c "cd '$SRC' && TEST_PORT=3097 node tools/test-ai.js" > /tmp/dopa-deploy-tests.txt 2>&1; then
+  grep -E "FAIL|fehlgeschlagen|Error" /tmp/dopa-deploy-tests.txt | head -40
+  echo "Abbruch: Tests rot – nichts verändert."
+  exit 1
+fi
+tail -2 /tmp/dopa-deploy-tests.txt
+
+echo "Sicherung …"
+tar -czf "$BK/$(date +%Y%m%d-%H%M%S).tgz" -C "$DST" "${EXCLUDES[@]}" .
+ls -1t "$BK"/*.tgz | tail -n +9 | xargs -r rm -f
+
+BEFORE=$(lock_sum)
+rsync -rlt --delete --chmod=D755,F644 "${EXCLUDES[@]}" "$SRC"/ "$DST"/
+if [ "$BEFORE" != "$(lock_sum)" ]; then
+  echo "Abhängigkeiten geändert – npm install …"
+  (cd "$DST" && npm install --omit=dev --no-audit --no-fund)
+fi
+
+if restart_and_check; then
+  echo "$COMMIT" > "$DST/.deployed-commit"
+  echo "Fertig: Server läuft mit Commit $COMMIT."
+else
+  echo "Neue Version startet nicht – automatisch zurück auf die vorige."
+  rollback
+  exit 1
+fi

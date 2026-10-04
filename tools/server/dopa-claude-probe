@@ -1,0 +1,19 @@
+#!/bin/bash
+# „Aktualisieren“ im Claude-Tab: eine winzige Haiku-Anfrage als Benutzer claude, damit die Statuszeile
+# (dopa-statusline) frische Limits schreibt. Kostet fast nichts. Läuft als root (vom Dopa-Server).
+set -u
+F=/home/claude/.claude/dopa-limits.json
+before=$(stat -c %Y "$F" 2>/dev/null || echo 0)
+S="probe-$$"
+sudo -u claude -H bash -c "cd ~/momentum && tmux new-session -d -s $S -x 120 -y 30 '/home/claude/.local/bin/claude --model haiku'" || exit 1
+sleep 8
+sudo -u claude tmux send-keys -t "$S" "Antworte nur mit ok"
+sleep 1
+sudo -u claude tmux send-keys -t "$S" Enter
+for _ in $(seq 1 30); do
+  sleep 1
+  now=$(stat -c %Y "$F" 2>/dev/null || echo 0)
+  [ "$now" -gt "$before" ] && break
+done
+sudo -u claude tmux kill-session -t "$S" 2>/dev/null
+exit 0

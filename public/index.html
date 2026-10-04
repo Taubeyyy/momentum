@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark" data-sect="today">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0d0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Momentum</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<section id="auth" class="hide">
+  <div class="auth-box">
+    <div class="logo">🌀</div>
+    <h2>Momentum</h2>
+    <p class="tagline">Eine Sache. Jetzt. Der Rest kann warten.</p>
+    <div class="card">
+      <div class="row" style="gap:6px;margin-bottom:14px">
+        <button class="chip on" id="tabLogin">Anmelden</button>
+        <button class="chip" id="tabReg">Neu hier</button>
+      </div>
+      <div class="field" id="fName" hidden>
+        <label>Name</label>
+        <input type="text" id="aName" placeholder="Wie soll ich dich nennen?" autocomplete="nickname">
+      </div>
+      <div class="field">
+        <label>E-Mail</label>
+        <input type="email" id="aMail" autocomplete="email" placeholder="du@mail.de">
+      </div>
+      <div class="field">
+        <label>Passwort</label>
+        <input type="password" id="aPass" autocomplete="current-password" placeholder="min. 8 Zeichen">
+      </div>
+      <div class="err" id="aErr"></div>
+      <button class="btn primary big" id="aGo" style="width:100%">Los geht's</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app">
+
+<!-- bleibt sichtbar, egal in welchem Tab man ist -->
+<div class="timerbar" id="timerBar">
+  <span class="tb-time" id="tbTime">0:00</span>
+  <span class="tb-task" id="tbTask"></span>
+  <button class="btn sm" id="tbToggle">⏸</button>
+  <button class="btn sm ghost" id="tbOpen">Öffnen</button>
+  <i class="tb-prog" id="tbProg"></i>
+</div>
+
+<main class="shell">
+
+  <!-- ---------- HEUTE ---------- -->
+  <section class="view on" data-view="today">
+    <div class="top">
+      <div>
+        <h1 id="greet">Hi</h1>
+        <div class="sub" id="dateLine"></div>
+      </div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnMood" title="Check-in">🫧</button>
+      <button class="iconbtn" id="btnSettings" title="Einstellungen">⚙️</button>
+    </div>
+
+    <div class="daybar" title="Wie viel vom wachen Tag rum ist"><i id="dayProgress"></i></div>
+
+    <div class="hero">
+      <div class="hero-label">Jetzt dran</div>
+      <div class="hero-title" id="nowTitle">Noch nichts geplant</div>
+      <div class="hero-meta" id="nowMeta">Tipp unten auf Tasks und schreib einfach irgendwas rein.</div>
+      <div class="hero-actions">
+        <button class="btn primary big" id="nowStart">▶ 25 min Fokus</button>
+        <button class="btn" id="nowSplit">✂️ Zerlegen</button>
+        <button class="btn ghost" id="nowSkip">↻ anderes</button>
+        <button class="btn ghost ai-only hide" id="nowAsk">✨ Was jetzt?</button>
+      </div>
+    </div>
+
+    <div class="card ai-only hide" id="reentryCard" hidden>
+      <h3>Wiedereinstieg</h3>
+      <div id="reentryBody"></div>
+    </div>
+
+    <div class="glance">
+      <div id="glFocus"><b>0m</b><span>Fokus</span></div>
+      <div id="glTasks"><b>0</b><span>Erledigt</span></div>
+      <div id="glSteps"><b>0</b><span>Schritte</span></div>
+      <div id="glStreak"><b>0</b><span>Tage</span></div>
+    </div>
+
+    <div class="card quiet">
+      <h3>Top 3 heute</h3>
+      <div id="top3"></div>
+      <button class="btn sm ghost" id="pickTop3" style="margin-top:10px">＋ Aufgabe markieren</button>
+    </div>
+
+    <div class="card quiet" id="routineToday">
+      <h3>Routinen</h3>
+      <div id="routineTodayList"></div>
+    </div>
+
+    <div class="card quiet">
+      <h3>Habits &amp; Meds</h3>
+      <div id="habitsQuick"></div>
+    </div>
+  </section>
+
+  <!-- ---------- TASKS ---------- -->
+  <section class="view" data-view="tasks">
+    <div class="top">
+      <div><h1>Aufgaben</h1><div class="sub" id="taskCount"></div></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnFilter" title="Nach Energie filtern">⚡</button>
+    </div>
+
+    <div class="quickadd">
+      <input type="text" id="qaTask" placeholder="Was muss raus aus dem Kopf?" enterkeyhint="done">
+      <button class="btn primary" id="qaAdd">＋</button>
+    </div>
+
+    <div class="row wrap" style="margin-bottom:12px;gap:6px">
+      <button class="chip on" data-energy="all">Alle</button>
+      <button class="chip" data-energy="low">🌱 Wenig Energie</button>
+      <button class="chip" data-energy="med">⚡ Normal</button>
+      <button class="chip" data-energy="high">🔥 Viel Energie</button>
+      <button class="chip" id="toggleDone">Erledigte zeigen</button>
+    </div>
+
+    <div id="taskList"></div>
+  </section>
+
+  <!-- ---------- FOKUS ---------- -->
+  <section class="view" data-view="focus">
+    <div class="top"><div><h1>Fokus</h1><div class="sub" id="focusSub">Timer läuft weiter, auch wenn du wegwischst</div></div></div>
+
+    <div class="timer-wrap">
+      <div class="ring">
+        <svg viewBox="0 0 200 200">
+          <circle class="track" cx="100" cy="100" r="88" fill="none" stroke-width="9"></circle>
+          <circle class="prog" id="ringProg" cx="100" cy="100" r="88" fill="none" stroke-width="9"
+                  stroke-dasharray="552.9" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="inner">
+          <div class="time" id="tTime">25:00</div>
+          <div class="state" id="tState">bereit</div>
+        </div>
+      </div>
+
+      <div class="focus-task" id="focusTask">Kein Task gewählt — geht auch ohne.</div>
+
+      <div class="presets" id="presets">
+        <button class="chip on" data-min="5">5</button>
+        <button class="chip" data-min="10">10</button>
+        <button class="chip" data-min="15">15</button>
+        <button class="chip" data-min="25">25</button>
+        <button class="chip" data-min="45">45</button>
+        <button class="chip" data-min="90">90</button>
+      </div>
+
+      <div class="row" style="justify-content:center;gap:9px">
+        <button class="btn primary big" id="tStart">▶ Start</button>
+        <button class="btn big" id="tStop">Stop</button>
+      </div>
+      <p class="dim" style="margin-top:14px">Leertaste = Start/Pause</p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Letzte 14 Tage</h3>
+      <div class="bars" id="focusBars"></div>
+      <div class="row" style="margin-top:9px"><span class="dim" id="focusTotal"></span></div>
+    </div>
+  </section>
+
+  <!-- ---------- ROUTINEN ---------- -->
+  <section class="view" data-view="routines">
+    <div class="top">
+      <div><h1>Routinen</h1><div class="sub">Autopilot statt Willenskraft</div></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="addRoutine">＋</button>
+    </div>
+    <div id="routineList"></div>
+
+    <div class="top" style="margin-top:24px">
+      <div><h1 style="font-size:1.2em">Habits &amp; Meds</h1></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="addHabit">＋</button>
+    </div>
+    <div class="card" id="habitList"></div>
+  </section>
+
+  <!-- ---------- DUMP ---------- -->
+  <section class="view" data-view="dump">
+    <div class="top"><div><h1>Brain Dump</h1><div class="sub">Rein damit. Sortieren kommt später.</div></div></div>
+    <div class="card">
+      <textarea id="dumpText" placeholder="Alles was im Kopf rumschwirrt… (Strg+Enter zum Speichern)"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="dumpSave">Rausschreiben</button>
+        <button class="btn ai-only hide" id="dumpCompile">✨ Sortieren</button>
+        <span class="spacer"></span>
+        <span class="dim" id="dumpCount"></span>
+      </div>
+    </div>
+    <div id="dumpList"></div>
+  </section>
+
+  <!-- ---------- WORTE ---------- -->
+  <section class="view" data-view="worte">
+    <div class="top"><div><h1>Worte</h1><div class="sub">Für Nachrichten, die seit Tagen liegen</div></div></div>
+
+    <div class="row wrap" style="gap:6px;margin-bottom:13px">
+      <button class="chip on" data-worte="write">✍️ Umschreiben</button>
+      <button class="chip" data-worte="read">🔍 Verstehen</button>
+    </div>
+
+    <div id="worteWrite">
+      <div class="card">
+        <textarea id="wText" placeholder="Dein Entwurf — auch wenn er hingerotzt ist. Genau dafür ist das hier."></textarea>
+        <div class="row wrap" style="gap:6px;margin-top:11px" id="wModes"></div>
+        <button class="btn primary" id="wGo" style="width:100%;margin-top:12px">Umschreiben</button>
+      </div>
+      <div id="wOut"></div>
+    </div>
+
+    <div id="worteRead" class="hide">
+      <div class="card">
+        <textarea id="rText" placeholder="Die Nachricht, die du bekommen hast und die dir im Kopf rumgeht."></textarea>
+        <button class="btn primary" id="rGo" style="width:100%;margin-top:12px">Einordnen</button>
+      </div>
+      <div id="rOut"></div>
+    </div>
+
+    <p class="dim" style="text-align:center;margin-top:18px" id="worteHint"></p>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button data-go="today" class="on"><i>🏠</i>Heute</button>
+  <button data-go="tasks"><i>☑️</i>Tasks</button>
+  <button data-go="focus"><i>⏱️</i>Fokus</button>
+  <button data-go="routines"><i>🔁</i>Routinen</button>
+  <button data-go="dump"><i>🧠</i>Dump</button>
+  <button data-go="worte" class="ai-only hide"><i>💬</i>Worte</button>
+</nav>
+</div>
+
+<div id="toast"></div>
+<div id="sheetHost"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+# Baut die iOS-App auf einem Mac-Runner und legt eine TrollStore-fertige .ipa
+# als GitHub-Release ab (Tag build-<Nummer>). Signiert wird nur per ldid mit
+# Entitlements – TrollStore übernimmt den Rest beim Installieren.
+name: iOS build
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: brew install xcodegen ldid
+
+      - name: Logik-Tests (Erkennungsregeln)
+        run: |
+          set -o pipefail
+          { swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/Timing.swift Shared/Sleep.swift Shared/Workshop.swift Dopa/Game.swift Tests/main.swift -o /tmp/logic && /tmp/logic; } 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+
+      - name: Bauen (unsigniert)
+        run: |
+          set -o pipefail
+          xcodebuild -project Dopa.xcodeproj -scheme Dopa \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=0.1.${{ github.run_number }} \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            build 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Mit ldid signieren + IPA packen
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Dopa.app
+          # erst die Erweiterung, dann die App; -I setzt die Signatur-ID auf die Bundle-ID
+          # (ohne -I nimmt ldid den Dateinamen, manche iOS-Dienste prüfen aber die ID)
+          ldid -SDopaWidget/DopaWidget.entitlements -Icom.taubey.dopa.widget "$APP/PlugIns/DopaWidget.appex/DopaWidget"
+          ldid -SDopa/Dopa.entitlements -Icom.taubey.dopa "$APP/Dopa"
+          ldid -e "$APP/Dopa"; ldid -e "$APP/PlugIns/DopaWidget.appex/DopaWidget"
+          mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          (cd out && zip -qry Dopa.ipa Payload)
+          ls -lh out/Dopa.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dopa-${{ github.run_number }}
+          path: ios/out/Dopa.ipa
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" out/Dopa.ipa \
+            --title "Dopa Build ${{ github.run_number }}" \
+            --notes "Commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)"
+
+      - name: Update auf den Dopa-Server legen (App zeigt „Neue Version“ mit Direkt-Installieren)
+        env:
+          RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
+        run: |
+          if [ -z "$RELEASE_SECRET" ]; then echo "kein Secret – übersprungen"; exit 0; fi
+          NOTES=$(git log -1 --pretty=%s | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()[:200]))')
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ github.run_number }}" \
+            -H "X-Release-Secret: $RELEASE_SECRET" -H "X-Release-Notes: $NOTES" \
+            -H "Content-Type: application/octet-stream" --data-binary @out/Dopa.ipa
+
+      - name: IPA durchleuchten (Info.plists, Plattform, Entitlements) und auf den Dopa-Server
+        if: success()
+        env:
+          RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
+        run: |
+          python3 ../tools/ipa-check.py out/Dopa.ipa > "$RUNNER_TEMP/ipa.txt" 2>&1 || true
+          cat "$RUNNER_TEMP/ipa.txt"
+          [ -z "$RELEASE_SECRET" ] && exit 0
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=ipa&ok=1" \
+            -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ipa.txt" || true
+
+      - name: Fehlerprotokoll auf den Dopa-Server (für Claude auf dem Server)
+        if: failure()
+        env:
+          RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
+        run: |
+          [ -z "$RELEASE_SECRET" ] && exit 0
+          { echo "Build ${{ github.run_number }} – Commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)"; echo;
+            grep -E "error:|✗|fehlgeschlagen|\*\* BUILD FAILED" "$RUNNER_TEMP/build.log" | head -150; echo; echo "--- Ende des Protokolls ---";
+            tail -120 "$RUNNER_TEMP/build.log"; } > "$RUNNER_TEMP/ci.txt" 2>/dev/null || true
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=build&ok=0" \
+            -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ci.txt"
+
+  # Tippt die App im Simulator durch und macht Fotos von jedem Bildschirm (für Claude zum Nachsehen)
+  ui:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: brew install xcodegen
+
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+
+      - name: Im Simulator durchtippen
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/shots"
+          DEVICE=$(xcrun simctl list devices available | grep -m1 -oE "iPhone 1[5-7][^(]*" | sed 's/ *$//')
+          echo "Simulator: $DEVICE"
+          TEST_RUNNER_SHOT_DIR="$RUNNER_TEMP/shots" xcodebuild test -project Dopa.xcodeproj -scheme Dopa \
+            -destination "platform=iOS Simulator,name=$DEVICE" -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/ui.log" | tail -60
+
+      - name: Ergebnis des Simulator-Rundgangs auf den Dopa-Server
+        if: always()
+        env:
+          RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
+          OK: ${{ job.status == 'success' && '1' || '0' }}
+        run: |
+          [ -z "$RELEASE_SECRET" ] && exit 0
+          { grep -E "error:|XCTAssert|failed|passed \(|Test Case" "$RUNNER_TEMP/ui.log" | head -80; } > "$RUNNER_TEMP/ui.txt" 2>/dev/null || true
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=ui&ok=$OK" \
+            -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ui.txt"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Screens-${{ github.run_number }}
+          path: ${{ runner.temp }}/shots

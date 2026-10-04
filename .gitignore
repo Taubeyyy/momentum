@@ -1,0 +1,18 @@
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+.env
+
+# iOS (wird im CI erzeugt)
+ios/*.xcodeproj/
+ios/build/
+ios/out/
+ios/Dopa/Info.plist
+ios/DopaWidget/Info.plist
+
+# nur auf dem Server (Freigaben für Claude dort)
+.claude/settings.local.json
+
+# nur auf dem Server: persönliche Hinweise für Claude
+CLAUDE.local.md

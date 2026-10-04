@@ -1,0 +1,47 @@
+#!/bin/bash
+# Claude-Aufträge aus der Dopa-App (Edwin hat das ausdrücklich so gewollt, 2026-10-03).
+# Läuft per systemd-run außerhalb von pm2 – ein `dopa-deploy` (pm2-Neustart) bricht den Auftrag nicht ab.
+#   dopa-claude-run <jobordner>          starten (vom Dopa-Server als root)
+#   dopa-claude-run --stop <jobordner>   abbrechen
+#   dopa-claude-run --inner <jobordner>  intern: läuft als Benutzer claude in der systemd-Einheit
+set -uo pipefail
+JOBS=/home/claude/.dopa-jobs
+
+check_dir() {
+  local id; id=$(basename "$1")
+  [[ "$1" == "$JOBS/$id" && "$id" =~ ^[a-z0-9-]+$ && -d "$1" ]] || { echo "falscher Auftragsordner" >&2; exit 1; }
+  echo "$id"
+}
+
+if [ "${1:-}" = "--stop" ]; then
+  ID=$(check_dir "$2")
+  touch "$2/stopped"
+  systemctl stop "dopa-job-$ID" 2>/dev/null || true
+  exit 0
+fi
+
+if [ "${1:-}" = "--inner" ]; then
+  DIR="$2"; check_dir "$DIR" >/dev/null
+  cd /home/claude/momentum || exit 1
+  SYS="Du läufst ohne Terminal: Edwin hat dir diesen Auftrag aus der Dopa-App geschickt und sieht deine Texte und Werkzeug-Aufrufe live auf dem Handy. Nachfragen und auf Antwort warten geht nicht – arbeite den Auftrag selbstständig nach CLAUDE.md ab und triff bei Kleinigkeiten eine vernünftige Entscheidung. Echte Fragen stellst du am Ende, Edwin kann danach im selben Gespräch weiterschreiben. Schreib kurz, locker und auf Deutsch. Lange Befehle wie dopa-ci --wait mit timeout 600000 aufrufen."
+  ARGS=(-p --output-format stream-json --verbose --permission-mode acceptEdits --append-system-prompt "$SYS"
+        --allowedTools Read Edit Write Glob Grep TodoWrite WebSearch WebFetch
+        "Bash(git *)" "Bash(npm test)" "Bash(npm ci)" "Bash(node tools/*)"
+        "Bash(sudo dopa-deploy*)" "Bash(sudo dopa-feedback*)" "Bash(sudo dopa-logs*)" "Bash(dopa-ci*)"
+        "Bash(ls *)" "Bash(cat *)" "Bash(grep *)" "Bash(sed -n *)" "Bash(head *)" "Bash(tail *)" "Bash(wc *)")
+  if [ -s "$DIR/resume" ]; then
+    R=$(cat "$DIR/resume")
+    [[ "$R" =~ ^[0-9a-f-]{36}$ ]] && ARGS+=(--resume "$R")
+  fi
+  claude "${ARGS[@]}" < "$DIR/prompt.txt" > "$DIR/out.jsonl" 2> "$DIR/err.log"
+  echo $? > "$DIR/exit"
+  exit 0
+fi
+
+DIR="${1:-}"
+ID=$(check_dir "$DIR")
+chown -R claude:claude "$DIR"
+systemd-run --quiet --collect --unit "dopa-job-$ID" --uid=claude --gid=claude \
+  -p RuntimeMaxSec=3600 --setenv=HOME=/home/claude \
+  --setenv=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin \
+  /usr/local/bin/dopa-claude-run --inner "$DIR"

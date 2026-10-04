@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+/* Statuszeile von Claude Code auf dem Dopa-Server. Merkt sich nebenbei die Pro-Limits (5 Std. + Woche)
+   und das Modell in ~/.claude/dopa-limits.json – die zeigt Dopa im Claude-Tab an.  */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+let raw = '';
+process.stdin.on('data', d => { raw += d; }).on('end', () => {
+  let d = {};
+  try { d = JSON.parse(raw); } catch {}
+  const rl = d.rate_limits || {};
+  const win = w => (w && typeof w.used_percentage === 'number') ? { pct: w.used_percentage, resetsAt: w.resets_at * 1000 } : null;
+  const fiveHour = win(rl.five_hour);
+  const week = win(rl.seven_day);
+  const model = (d.model && (d.model.display_name || d.model.id)) || null;
+  const file = path.join(os.homedir(), '.claude', 'dopa-limits.json');
+  if (fiveHour || week) {
+    try {
+      fs.writeFileSync(file + '.tmp', JSON.stringify({ fiveHour, week, model, at: Date.now() }));
+      fs.renameSync(file + '.tmp', file);
+    } catch {}
+  }
+  const parts = [model || 'Claude'];
+  if (fiveHour) parts.push(`5h ${Math.round(fiveHour.pct)}%`);
+  if (week) parts.push(`Woche ${Math.round(week.pct)}%`);
+  process.stdout.write(parts.join(' · '));
+});

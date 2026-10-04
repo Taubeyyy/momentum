@@ -1,0 +1,475 @@
+/* ============================================================
+   Momentum — Designsystem
+
+   Vier Regeln, die alles andere bestimmen:
+   1. Genau eine Sache darf laut sein. Der Rest tritt zurück.
+   2. Die Aktionsfarbe ist IMMER dieselbe. Nie raten müssen, was der Knopf ist.
+   3. Farbe pro Bereich nur als Orientierung — nie als Aktion.
+   4. Bewegung ist optional. Immer.
+   ============================================================ */
+
+:root {
+  /* Grund — leicht warmes Anthrazit statt kaltem Blaugrau */
+  --bg:      #0d0f14;
+  --bg-2:    #12151d;
+  --card:    #171b26;
+  --card-2:  #1f2431;
+  --card-3:  #272d3d;
+  --line:    #2a3140;
+  --line-2:  #384156;
+
+  /* Text — drei Stufen, klar getrennt */
+  --text:    #eef1f8;
+  --muted:   #99a3ba;
+  --dim:     #6b7590;
+
+  /* Aktion — konstant über die ganze App */
+  --accent:    #7b8fff;
+  --accent-in: #0b0e18;
+
+  /* Bedeutung */
+  --good: #5fd39a;
+  --warn: #ffc16b;
+  --hot:  #ff8b9e;
+
+  /* Bereichsfarbe — nur Orientierung, nie Aktion */
+  --sect: #8b9dff;
+
+  /* Maß */
+  --r-s: 10px;
+  --r:   14px;
+  --r-l: 20px;
+  --r-xl: 26px;
+  --tap: 44px;                       /* kleinstes Tap-Ziel */
+  --nav-h: 68px;
+  --shadow:   0 10px 34px rgba(0,0,0,.42);
+  --shadow-s: 0 3px 12px rgba(0,0,0,.25);
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+          0 8px 30px color-mix(in srgb, var(--accent) 18%, transparent);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  --scale: 1;                        /* Textgröße, per Einstellung */
+  --speed: 1;                        /* 0 = Bewegung aus */
+}
+
+/* Bereichsfarben — gesetzt über data-sect am <html> */
+:root[data-sect="today"]    { --sect: #8b9dff; }
+:root[data-sect="tasks"]    { --sect: #5fd39a; }
+:root[data-sect="focus"]    { --sect: #ff9f6b; }
+:root[data-sect="routines"] { --sect: #6cc5ff; }
+:root[data-sect="dump"]     { --sect: #c49bff; }
+:root[data-sect="worte"]    { --sect: #ffd166; }
+
+/* Hell */
+:root[data-theme="light"] {
+  --bg: #f2f4f9; --bg-2: #ffffff; --card: #ffffff; --card-2: #f1f4fa; --card-3: #e6ebf5;
+  --line: #dde3ef; --line-2: #c9d2e3;
+  --text: #10141d; --muted: #5a6479; --dim: #8b94a8;
+  --accent: #4d63e8; --accent-in: #ffffff;
+  --good: #1f9d68; --warn: #b97a09; --hot: #d64a63;
+  --shadow: 0 8px 26px rgba(25,35,70,.10); --shadow-s: 0 2px 8px rgba(25,35,70,.07);
+}
+
+/* Reizarm — Sättigung raus, Kontrast bleibt */
+:root[data-calm="on"] {
+  --accent: #8496b8; --sect: #8496b8 !important;
+  --good: #7fae94; --warn: #c4a878; --hot: #c48b96;
+}
+
+/* Bewegung aus — per Einstellung oder per System */
+:root[data-motion="off"] { --speed: 0; }
+@media (prefers-reduced-motion: reduce) { :root { --speed: 0; } }
+:root[data-motion="off"] *, :root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important; scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Grundlagen ---------- */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: calc(16px * var(--scale)); line-height: 1.5;
+  -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; padding: 0; }
+h1, h2, h3, h4 { margin: 0; font-weight: 660; letter-spacing: -.015em; }
+p { margin: 0 0 .7em; }
+a { color: var(--accent); }
+.hide { display: none !important; }
+.spacer { flex: 1; }
+.row { display: flex; align-items: center; gap: 10px; }
+.wrap { flex-wrap: wrap; }
+.muted { color: var(--muted); }
+.dim { color: var(--dim); font-size: .86em; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* ---------- Layout ---------- */
+#app { display: none; min-height: 100%; }
+#app.on { display: block; }
+.shell {
+  max-width: 760px; margin: 0 auto;
+  padding: 18px 16px calc(var(--nav-h) + 34px);
+}
+body.timer-on .shell { padding-top: 68px; }
+@media (min-width: 900px) {
+  .shell { max-width: 1000px; padding: 30px 32px 48px 122px; }
+  body.timer-on .shell { padding-top: 80px; }
+}
+
+/* ---------- Kopfzeile ---------- */
+.top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.top h1 { font-size: clamp(1.22em, 5.4vw, 1.5em); line-height: 1.2; }
+.top .sub { color: var(--muted); font-size: .85em; margin-top: 3px; }
+.iconbtn {
+  width: var(--tap); height: var(--tap); border-radius: var(--r);
+  background: var(--card); border: 1px solid var(--line);
+  display: grid; place-items: center; font-size: 1.05em; flex: none;
+  transition: background calc(.15s * var(--speed)), border-color calc(.15s * var(--speed));
+}
+.iconbtn:hover { background: var(--card-2); border-color: var(--line-2); }
+
+/* ---------- Karten ----------
+   Zwei Lautstärken: .card ist normal, .card.quiet tritt zurück.
+   Alles unterhalb des Heros ist "quiet", damit der Hero gewinnt.        */
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-l); padding: 17px; margin-bottom: 14px;
+}
+.card.quiet { background: color-mix(in srgb, var(--card) 55%, transparent); border-color: color-mix(in srgb, var(--line) 65%, transparent); }
+.card > h3 {
+  font-size: .76em; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .09em; margin-bottom: 13px; font-weight: 650;
+  display: flex; align-items: center; gap: 8px;
+}
+.card > h3::before {
+  content: ''; width: 6px; height: 6px; border-radius: 2px;
+  background: var(--sect); flex: none;
+}
+.empty { color: var(--dim); text-align: center; padding: 26px 12px; font-size: .93em; line-height: 1.55; }
+
+/* ---------- Knöpfe ---------- */
+.btn {
+  background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 12px 17px; font-weight: 560; min-height: var(--tap); white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  transition: transform calc(.12s * var(--speed)), background calc(.15s * var(--speed)),
+              border-color calc(.15s * var(--speed));
+}
+.btn:hover { background: var(--card-3); border-color: var(--line-2); }
+.btn:active { transform: scale(calc(1 - .025 * var(--speed))); }
+.btn:disabled { opacity: .55; cursor: default; transform: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-in); font-weight: 640; }
+.btn.primary:hover { filter: brightness(1.09); background: var(--accent); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--card-2); color: var(--text); }
+.btn.big { padding: 16px 24px; font-size: 1.05em; min-height: 54px; border-radius: var(--r-l); }
+.btn.sm { padding: 7px 12px; font-size: .84em; min-height: 34px; border-radius: var(--r-s); }
+.btn.danger { color: var(--hot); }
+
+.chip {
+  padding: 9px 14px; border-radius: 99px; background: var(--card-2);
+  border: 1px solid var(--line); font-size: .87em; color: var(--muted);
+  min-height: 38px; display: inline-flex; align-items: center; gap: 6px;
+  transition: background calc(.15s * var(--speed)), color calc(.15s * var(--speed));
+}
+.chip:hover { background: var(--card-3); color: var(--text); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-in); font-weight: 620; }
+
+/* ---------- Eingaben ---------- */
+input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=time], textarea, select {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 13px 14px; min-height: var(--tap); outline: none;
+  transition: border-color calc(.15s * var(--speed));
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
+::placeholder { color: var(--dim); }
+
+/* ---------- Navigation ---------- */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; height: var(--nav-h); z-index: 40;
+  background: color-mix(in srgb, var(--bg-2) 90%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid var(--line);
+  display: flex; padding-bottom: env(safe-area-inset-bottom);
+}
+nav.tabs button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; color: var(--dim); font-size: .62em; font-weight: 650; letter-spacing: .01em;
+  position: relative; transition: color calc(.15s * var(--speed));
+}
+nav.tabs button i { font-style: normal; font-size: 1.4em; line-height: 1; filter: grayscale(.6) opacity(.75); transition: filter calc(.15s * var(--speed)); }
+nav.tabs button.on { color: var(--sect); }
+nav.tabs button.on i { filter: none; }
+nav.tabs button.on::after {
+  content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 26px; height: 3px; border-radius: 0 0 3px 3px; background: var(--sect);
+}
+@media (min-width: 900px) {
+  nav.tabs {
+    top: 0; right: auto; width: 90px; height: 100vh; flex-direction: column;
+    border-top: none; border-right: 1px solid var(--line); padding: 22px 0; gap: 6px;
+  }
+  nav.tabs button { flex: none; height: 66px; font-size: .68em; }
+  nav.tabs button.on::after { top: 50%; left: 0; transform: translateY(-50%); width: 3px; height: 26px; border-radius: 0 3px 3px 0; }
+}
+
+/* ---------- Ansichtswechsel ---------- */
+.view { display: none; }
+.view.on { display: block; animation: rise calc(.22s * var(--speed)) ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   HERO — die eine Sache. Bewusst überproportional.
+   ============================================================ */
+.hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(158deg, var(--card-2) 0%, var(--card) 62%);
+  border: 1px solid var(--line-2); border-radius: var(--r-xl);
+  padding: 24px 22px; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+.hero::before {                                   /* stiller Bereichs-Schimmer */
+  content: ''; position: absolute; inset: -60% 40% 55% -30%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--sect) 26%, transparent), transparent);
+  pointer-events: none;
+}
+.hero > * { position: relative; }
+.hero-label {
+  font-size: .7em; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--sect); font-weight: 750; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 7px;
+}
+.hero-label::before { content: ''; width: 7px; height: 7px; border-radius: 99px; background: var(--sect); }
+.hero-title {
+  font-size: clamp(1.6em, 6.4vw, 2.05em); line-height: 1.2; font-weight: 680;
+  letter-spacing: -.025em; margin-bottom: 10px; word-break: break-word;
+}
+.hero-meta { color: var(--muted); font-size: .88em; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero-actions .btn.primary { flex: 1 1 auto; min-width: 170px; box-shadow: var(--glow); }
+
+/* ---------- Tagesüberblick: eine ruhige Zeile statt vier Kästen ---------- */
+.glance {
+  display: flex; align-items: center; gap: 0; margin-bottom: 16px;
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-radius: var(--r); padding: 4px;
+}
+.glance > div { flex: 1; text-align: center; padding: 9px 4px; position: relative; }
+.glance > div + div::before {
+  content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 1px; background: var(--line);
+}
+.glance b { display: block; font-size: 1.05em; font-weight: 660; font-variant-numeric: tabular-nums; }
+.glance span { font-size: .66em; color: var(--dim); text-transform: uppercase; letter-spacing: .07em; }
+.glance .zero b { color: var(--dim); font-weight: 500; }
+
+/* ---------- Tagesfortschritt: Zeit sichtbar machen ---------- */
+.daybar { height: 3px; background: var(--line); border-radius: 99px; margin: 0 0 18px; overflow: hidden; }
+.daybar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sect), color-mix(in srgb, var(--sect) 40%, transparent)); }
+
+/* ============================================================
+   Timerleiste — bleibt sichtbar, egal wo man ist
+   ============================================================ */
+.timerbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 45;
+  display: none; align-items: center; gap: 12px;
+  padding: 11px 15px calc(11px + env(safe-area-inset-top));
+  background: color-mix(in srgb, var(--bg-2) 93%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--line);
+  animation: drop calc(.25s * var(--speed)) cubic-bezier(.2,.8,.3,1);
+}
+body.timer-on .timerbar { display: flex; }
+@keyframes drop { from { transform: translateY(-100%); } to { transform: none; } }
+@media (min-width: 900px) { .timerbar { left: 90px; } }
+.timerbar .tb-time {
+  font-size: 1.15em; font-weight: 640; font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; color: var(--accent); min-width: 62px;
+}
+.timerbar .tb-task { flex: 1; min-width: 0; font-size: .87em; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timerbar .tb-prog { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); transition: width 1s linear; }
+.timerbar.paused .tb-time { color: var(--warn); }
+
+/* ============================================================
+   Aufgaben
+   ============================================================ */
+.task {
+  display: flex; align-items: flex-start; gap: 13px; padding: 14px 15px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  margin-bottom: 9px;
+  transition: opacity calc(.2s * var(--speed)), transform calc(.2s * var(--speed)),
+              border-color calc(.15s * var(--speed));
+}
+.task:hover { border-color: var(--line-2); }
+.task.sub { margin-left: 22px; background: color-mix(in srgb, var(--card) 55%, transparent); padding: 11px 14px; }
+.task.done { opacity: .4; }
+.task.done .t-title { text-decoration: line-through; }
+.task.going { transform: translateX(10px) scale(.985); opacity: .25; }
+.task .body { flex: 1; min-width: 0; }
+.t-title { font-weight: 530; word-break: break-word; line-height: 1.4; }
+.t-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap;
+  font-size: .78em; color: var(--dim); }
+.tag { padding: 3px 9px; border-radius: 99px; background: var(--card-2); font-size: .95em; }
+.tag.low { color: var(--good); } .tag.med { color: var(--warn); } .tag.high { color: var(--hot); }
+
+.tick {
+  width: 26px; height: 26px; border-radius: 9px; border: 2px solid var(--line-2);
+  flex: none; margin-top: 1px; display: grid; place-items: center;
+  font-size: .85em; color: transparent;
+  transition: background calc(.18s * var(--speed)), border-color calc(.18s * var(--speed)), transform calc(.18s * var(--speed));
+}
+.tick:hover { border-color: var(--accent); }
+.task.done .tick, .step.done .tick {
+  background: var(--good); border-color: var(--good); color: var(--accent-in);
+  animation: pop calc(.32s * var(--speed)) cubic-bezier(.3,1.5,.5,1);
+}
+@keyframes pop { 0% { transform: scale(.7); } 55% { transform: scale(1.22); } 100% { transform: scale(1); } }
+.t-actions { display: flex; gap: 2px; }
+.t-actions button {
+  width: 34px; height: 34px; border-radius: var(--r-s); display: grid; place-items: center;
+  color: var(--dim); transition: background calc(.15s * var(--speed)), color calc(.15s * var(--speed));
+}
+.t-actions button:hover { background: var(--card-2); color: var(--text); }
+.star { font-size: 1em; }
+
+.quickadd { display: flex; gap: 9px; margin-bottom: 15px; }
+.quickadd input { flex: 1; }
+.quickadd .btn { flex: none; width: var(--tap); padding: 0; font-size: 1.2em; }
+
+.more-btn {
+  width: 100%; padding: 13px; border-radius: var(--r); border: 1px dashed var(--line-2);
+  color: var(--muted); font-size: .88em; font-weight: 560; margin-top: 4px;
+}
+.more-btn:hover { color: var(--text); border-color: var(--accent); }
+
+/* ============================================================
+   Fokus
+   ============================================================ */
+.timer-wrap { text-align: center; padding: 8px 0 4px; }
+.ring { position: relative; width: min(300px, 76vw); aspect-ratio: 1; margin: 0 auto 22px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { stroke: var(--line); }
+.ring .prog { stroke: var(--sect); stroke-linecap: round; transition: stroke-dashoffset calc(.5s * var(--speed)) linear; }
+.ring .inner { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 5px; }
+.ring .time { font-size: 3.1em; font-weight: 250; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+.ring .state { font-size: .72em; text-transform: uppercase; letter-spacing: .16em; color: var(--muted); font-weight: 620; }
+.presets { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+.presets .chip { min-width: 50px; justify-content: center; }
+.focus-task { color: var(--muted); font-size: .9em; margin-bottom: 16px; min-height: 22px; }
+.focus-task b { color: var(--text); font-weight: 560; }
+
+/* ============================================================
+   Routinen · Habits
+   ============================================================ */
+.step { display: flex; align-items: center; gap: 11px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.step:last-child { border-bottom: none; }
+.step .s-title { flex: 1; min-width: 0; line-height: 1.35; }
+.step.done .s-title { text-decoration: line-through; color: var(--dim); }
+
+/* Löschen sitzt direkt neben der Checkbox — also klein, still und nur auf Hover deutlich.
+   Ein gleich lauter Button daneben wäre ein Fehlklick-Risiko. */
+.rowx {
+  width: 30px; height: 30px; flex: none; border-radius: 8px; display: grid; place-items: center;
+  color: var(--dim); font-size: .8em; opacity: .5;
+  transition: opacity calc(.15s * var(--speed)), background calc(.15s * var(--speed)), color calc(.15s * var(--speed));
+}
+.rowx:hover { opacity: 1; color: var(--hot); background: color-mix(in srgb, var(--hot) 14%, transparent); }
+.progbar { height: 7px; background: var(--card-2); border-radius: 99px; overflow: hidden; margin: 6px 0 12px; }
+.progbar i { display: block; height: 100%; border-radius: 99px; background: var(--good);
+  transition: width calc(.45s * var(--speed)) cubic-bezier(.3,1,.4,1); }
+.progbar.full i { background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--good) 55%, var(--accent))); }
+
+.habit { display: flex; align-items: center; gap: 13px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.habit:last-child { border-bottom: none; }
+.hicon { width: 42px; height: 42px; border-radius: var(--r); display: grid; place-items: center;
+  font-size: 1.15em; background: var(--card-2); flex: none; }
+.hcount { display: flex; align-items: center; gap: 8px; }
+.hcount .btn { width: 36px; padding: 0; font-size: 1.1em; }
+.hcount b { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 640; }
+.dots { display: flex; gap: 4px; margin-top: 6px; }
+.dots i { width: 9px; height: 9px; border-radius: 3px; background: var(--card-3); }
+.dots i.on { background: var(--good); }
+
+/* ============================================================
+   Dump · Worte
+   ============================================================ */
+.dump-item {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 14px; margin-bottom: 9px; display: flex; gap: 11px; align-items: flex-start;
+}
+.dump-item p { margin: 0; flex: 1; word-break: break-word; white-space: pre-wrap; line-height: 1.5; }
+
+/* ---------- Stimmung ---------- */
+.scale { display: flex; gap: 8px; }
+.scale button {
+  flex: 1; aspect-ratio: 1; max-width: 60px; border-radius: var(--r);
+  background: var(--card-2); border: 1px solid var(--line); font-size: 1.35em;
+  transition: transform calc(.18s * var(--speed)), background calc(.15s * var(--speed));
+}
+.scale button.on { background: var(--accent); border-color: var(--accent); transform: scale(1.07); }
+.mood-row { margin-bottom: 17px; }
+.mood-row label { display: block; font-size: .85em; color: var(--muted); margin-bottom: 9px; }
+
+/* ---------- Balken ---------- */
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 96px; }
+.bars > div { flex: 1; background: var(--sect); border-radius: 4px 4px 2px 2px; min-height: 3px; }
+
+/* ============================================================
+   Sheet
+   ============================================================ */
+.sheet-bg {
+  position: fixed; inset: 0; background: rgba(4,6,12,.62); z-index: 60;
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fade calc(.18s * var(--speed)); backdrop-filter: blur(3px);
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (min-width: 640px) { .sheet-bg { align-items: center; } }
+.sheet {
+  background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: var(--r-xl) var(--r-xl) 0 0; width: 100%; max-width: 580px;
+  max-height: 88vh; overflow-y: auto; padding: 22px 18px calc(28px + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow); animation: up calc(.26s * var(--speed)) cubic-bezier(.2,.85,.3,1);
+}
+@media (min-width: 640px) { .sheet { border-radius: var(--r-xl); } }
+@keyframes up { from { transform: translateY(34px); opacity: .5; } to { transform: none; opacity: 1; } }
+.sheet h3 { font-size: 1.2em; margin-bottom: 16px; color: var(--text); text-transform: none; letter-spacing: -.02em; }
+.sheet h3::before { display: none; }
+.field { margin-bottom: 15px; }
+.field label { display: block; font-size: .85em; color: var(--muted); margin-bottom: 7px; }
+
+/* ============================================================
+   Anmeldung
+   ============================================================ */
+#auth { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+#auth.hide { display: none; }
+.auth-box { width: 100%; max-width: 400px; }
+.auth-box .logo { font-size: 2.6em; text-align: center; margin-bottom: 6px; }
+.auth-box h2 { text-align: center; font-size: 1.7em; margin-bottom: 6px; }
+.auth-box .tagline { text-align: center; color: var(--muted); font-size: .92em; margin-bottom: 26px; }
+.err { color: var(--hot); font-size: .87em; min-height: 20px; margin: 8px 0; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 20px);
+  transform: translateX(-50%) translateY(10px);
+  background: var(--card-3); border: 1px solid var(--line-2); color: var(--text);
+  padding: 13px 19px; border-radius: var(--r); z-index: 90; box-shadow: var(--shadow);
+  font-size: .9em; font-weight: 540; opacity: 0; pointer-events: none;
+  transition: opacity calc(.22s * var(--speed)), transform calc(.22s * var(--speed));
+  max-width: min(400px, calc(100vw - 32px)); text-align: center;
+}
+#toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (min-width: 900px) { #toast { bottom: 26px; left: calc(50% + 45px); } }

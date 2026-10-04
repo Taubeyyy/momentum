@@ -1,0 +1,22 @@
+{
+  "name": "Momentum",
+  "short_name": "Momentum",
+  "description": "ADHS-freundlich: eine Sache jetzt, Fokus-Timer, Routinen, Brain Dump.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0f14",
+  "theme_color": "#0d0f14",
+  "categories": ["productivity", "lifestyle", "health"],
+  "lang": "de",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Fokus starten", "url": "/?go=focus", "description": "Direkt in den Timer" },
+    { "name": "Brain Dump", "url": "/?go=dump", "description": "Gedanken rausschreiben" }
+  ]
+}

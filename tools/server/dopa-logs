@@ -1,0 +1,5 @@
+#!/bin/bash
+# Letzte Zeilen aus dem Log des Dopa-Servers: sudo dopa-logs [Zeilen]
+export PM2_HOME=/root/.pm2
+n=${1:-80}; [[ "$n" =~ ^[0-9]+$ ]] || n=80; [ "$n" -gt 1000 ] && n=1000
+exec pm2 logs momentum --nostream --lines "$n"

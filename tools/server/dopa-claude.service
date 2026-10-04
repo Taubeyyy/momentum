@@ -1,0 +1,18 @@
+# Claude Code (Remote Control) für Dopa – läuft in der tmux-Sitzung „dopa“ des Benutzers claude.
+# Ansehen: sudo -iu claude tmux attach -t dopa   (wieder raus: Strg+B, dann D)
+[Unit]
+Description=Claude Code Remote Control (Dopa-Server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=claude
+WorkingDirectory=/home/claude/momentum
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/tmux new-session -d -s dopa -c /home/claude/momentum "claude remote-control --name Dopa-Server --permission-mode acceptEdits --spawn=same-dir"
+ExecStop=/usr/bin/tmux kill-session -t dopa
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

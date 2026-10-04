@@ -1,0 +1,3 @@
+#!/bin/bash
+# Feedback aus der Dopa-App: sudo dopa-feedback [--all | --done <id> "Notiz" | --summary]
+cd /var/www/momentum && exec node tools/feedback.js "$@"
