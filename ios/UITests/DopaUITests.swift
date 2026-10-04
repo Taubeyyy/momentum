@@ -38,8 +38,8 @@ final class DopaUITests: XCTestCase {
             shot(String(format: "%02d-%@", i + 3, tab))
         }
 
-        // „Mehr“-Bubble: Claude und Geld
-        for (i, item) in ["Claude", "Geld", "Schlaf"].enumerated() {
+        // „Mehr“-Bubble: Geld und Schlaf
+        for (i, item) in ["Geld", "Schlaf"].enumerated() {
             let more = app.buttons["Mehr"].firstMatch
             XCTAssertTrue(more.waitForExistence(timeout: 5), "Mehr-Knopf fehlt")
             more.tap()

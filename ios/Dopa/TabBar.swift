@@ -1,10 +1,10 @@
 import SwiftUI
 
 // Aufteilung seit Build 57: Heute · Machen (Aufgaben + Plan) · Merken · Einkauf · Mehr (Bubble:
-// Geld, Schlaf, Dot, Claude, Profil). `day` und `claude` gibt es als Ziele weiter – Router.go leitet um.
+// Geld, Schlaf, Dot, Profil). `day` gibt es als Ziel weiter – Router.go leitet um. Claude hat seit Build 58 eine eigene App.
 
 enum AppTab: Int, CaseIterable, Hashable {
-    case today, tasks, day, memo, shop, claude, more
+    case today, tasks, day, memo, shop, more
 
     /// Was unten in der Leiste steht.
     static let bar: [AppTab] = [.today, .tasks, .memo, .shop, .more]
@@ -16,7 +16,6 @@ enum AppTab: Int, CaseIterable, Hashable {
         case .day: "Plan"
         case .memo: "Merken"
         case .shop: "Einkauf"
-        case .claude: "Claude"
         case .more: "Mehr"
         }
     }
@@ -28,7 +27,6 @@ enum AppTab: Int, CaseIterable, Hashable {
         case .day: "calendar"
         case .memo: "note.text"
         case .shop: "bag"
-        case .claude: "sparkles"
         case .more: "square.grid.2x2"
         }
     }
@@ -39,14 +37,13 @@ enum DoSection: Hashable { case tasks, plan }
 
 /// Was in der „Mehr“-Bubble steht.
 enum MoreItem: Int, CaseIterable, Hashable {
-    case money, sleep, dot, claude, profile
+    case money, sleep, dot, profile
 
     var title: String {
         switch self {
         case .money: "Geld"
         case .sleep: "Schlaf"
         case .dot: "Dot"
-        case .claude: "Claude"
         case .profile: "Profil"
         }
     }
@@ -56,7 +53,6 @@ enum MoreItem: Int, CaseIterable, Hashable {
         case .money: "eurosign.circle.fill"
         case .sleep: "bed.double.fill"
         case .dot: "bubble.left.and.text.bubble.right.fill"
-        case .claude: "sparkles"
         case .profile: "person.crop.circle.fill"
         }
     }
@@ -66,7 +62,6 @@ enum MoreItem: Int, CaseIterable, Hashable {
         case .money: Color(hex: 0x4ADE80)
         case .sleep: Color(hex: 0x6366F1)
         case .dot: Color(hex: 0x8B5CF6)
-        case .claude: Color(hex: 0xF59E0B)
         case .profile: Color(hex: 0x94A3B8)
         }
     }

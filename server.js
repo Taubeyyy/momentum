@@ -28,22 +28,28 @@ app.put('/api/dopa/backup', express.json({ limit: '8mb' }), (req, res, next) => 
 });
 /* ---------- Updates (Feedback #32): CI legt jede neue .ipa hier ab, die App fragt nach ---------- */
 const RELEASE_DIR = process.env.RELEASE_DIR || path.join(__dirname, 'releases');
+// Zwei Apps aus diesem Repo: Dopa (Standard) und die Claude-App
+const RELEASE_APPS = { dopa: { prefix: 'Dopa', latest: 'latest.json' }, claude: { prefix: 'Claude', latest: 'latest-claude.json' } };
+const releaseApp = id => RELEASE_APPS[id || 'dopa'] || null;
 app.put('/api/dopa/release', express.raw({ type: '*/*', limit: '9mb' }), (req, res) => {
   const secret = process.env.DOPA_RELEASE_SECRET;
   if (!secret || req.get('x-release-secret') !== secret) return res.status(403).json({ error: 'nein' });
   const build = parseInt(req.query.build, 10);
+  const rel = releaseApp(req.query.app);
+  if (!rel) return res.status(400).json({ error: 'unbekannte App' });
   if (!Number.isInteger(build) || build < 1 || !Buffer.isBuffer(req.body) || req.body.length < 100_000) {
     return res.status(400).json({ error: 'keine gültige ipa' });
   }
   let notes = '';
   try { notes = decodeURIComponent(req.get('x-release-notes') || '').slice(0, 300); } catch {}
   fs.mkdirSync(RELEASE_DIR, { recursive: true });
-  fs.writeFileSync(path.join(RELEASE_DIR, `Dopa-${build}.ipa`), req.body);
-  fs.writeFileSync(path.join(RELEASE_DIR, 'latest.json'), JSON.stringify({ build, notes, at: Date.now() }));
+  fs.writeFileSync(path.join(RELEASE_DIR, `${rel.prefix}-${build}.ipa`), req.body);
+  fs.writeFileSync(path.join(RELEASE_DIR, rel.latest), JSON.stringify({ build, notes, at: Date.now() }));
   // nur die letzten drei Builds behalten
-  const old = fs.readdirSync(RELEASE_DIR).map(f => /^Dopa-(\d+)\.ipa$/.exec(f)).filter(Boolean)
+  const re = new RegExp('^' + rel.prefix + '-(\\d+)\\.ipa$');
+  const old = fs.readdirSync(RELEASE_DIR).map(f => re.exec(f)).filter(Boolean)
     .map(m => Number(m[1])).sort((a, b) => b - a).slice(3);
-  for (const n of old) fs.rmSync(path.join(RELEASE_DIR, `Dopa-${n}.ipa`), { force: true });
+  for (const n of old) fs.rmSync(path.join(RELEASE_DIR, `${rel.prefix}-${n}.ipa`), { force: true });
   res.json({ ok: true, build });
 });
 
@@ -66,13 +72,14 @@ app.put('/api/dopa/ci-log', express.text({ type: '*/*', limit: '2mb' }), (req, r
 });
 
 app.get('/api/dopa/latest', (req, res) => {
+  const rel = releaseApp(req.query.app) || releaseApp('dopa');
   let latest = { build: 0, notes: '', at: 0 };
-  try { latest = JSON.parse(fs.readFileSync(path.join(RELEASE_DIR, 'latest.json'), 'utf8')); } catch {}
+  try { latest = JSON.parse(fs.readFileSync(path.join(RELEASE_DIR, rel.latest), 'utf8')); } catch {}
   const token = process.env.DOPA_DL_TOKEN;
   const host = process.env.PUBLIC_HOST || 'dopa.taubey.com';
   res.json({
     build: latest.build, notes: latest.notes || '', at: latest.at,
-    url: token && latest.build ? `https://${host}/dl/${token}/Dopa-${latest.build}.ipa` : null,
+    url: token && latest.build ? `https://${host}/dl/${token}/${rel.prefix}-${latest.build}.ipa` : null,
     page: 'https://github.com/Taubeyyy/momentum/releases/latest'
   });
 });
@@ -80,7 +87,7 @@ app.get('/api/dopa/latest', (req, res) => {
 // Direkter Download für TrollStore (apple-magnifier://install?url=…) – geheimer Pfad statt Login
 app.get('/dl/:token/:file', (req, res) => {
   const token = process.env.DOPA_DL_TOKEN;
-  if (!token || req.params.token !== token || !/^Dopa-\d+\.ipa$/.test(req.params.file)) return res.status(404).end();
+  if (!token || req.params.token !== token || !/^(Dopa|Claude)-\d+\.ipa$/.test(req.params.file)) return res.status(404).end();
   const file = path.join(RELEASE_DIR, req.params.file);
   if (!fs.existsSync(file)) return res.status(404).end();
   res.setHeader('Content-Type', 'application/octet-stream');
@@ -617,181 +624,8 @@ app.get('/api/ai/status', auth, (req, res) => res.json({
    Zustandslos: die App schickt Text, bekommt Struktur. Daten bleiben in der App,
    der Server hält nur Feedback und das Backup. */
 
-// ---------- Claude auf dem Server (Claude-Tab in Dopa): Pro-Limits + Modell, nur für den Besitzer
-// Die Limits schreibt Claude Codes Statuszeile (tools/server/dopa-statusline) nach ~/.claude/dopa-limits.json.
-const { execFile } = require('child_process');
-const CLAUDE_HOME = process.env.CLAUDE_HOME || '/home/claude';
-const CLAUDE_PROBE = process.env.CLAUDE_PROBE || '/usr/local/bin/dopa-claude-probe';
-const CLAUDE_MODELS = [
-  { id: 'default', label: 'Standard', hint: 'Was Claude Code für dein Abo empfiehlt' },
-  { id: 'opus', label: 'Opus', hint: 'Am klügsten, frisst das Limit am schnellsten' },
-  { id: 'sonnet', label: 'Sonnet', hint: 'Schnell und gut – reicht für die meisten Updates' },
-  { id: 'haiku', label: 'Haiku', hint: 'Sehr sparsam, nur für Kleinkram' },
-];
-const readJSONFile = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const claudeSettingsFile = () => path.join(CLAUDE_HOME, '.claude', 'settings.json');
-
-function ownerOnly(req, res, next) {
-  const owner = Number(process.env.DOPA_OWNER_ID) || db.prepare('SELECT MIN(id) AS m FROM users').get().m;
-  if (req.user.id !== owner) return res.status(403).json({ error: 'Nur für den Besitzer' });
-  next();
-}
-
-function claudeState() {
-  const settings = readJSONFile(claudeSettingsFile());
-  const limits = readJSONFile(path.join(CLAUDE_HOME, '.claude', 'dopa-limits.json'));
-  const model = settings && CLAUDE_MODELS.some(m => m.id === settings.model) ? settings.model : 'default';
-  return {
-    installed: !!settings,
-    model,
-    models: CLAUDE_MODELS,
-    limits: limits ? { fiveHour: limits.fiveHour || null, week: limits.week || null, model: limits.model || null, at: limits.at || null } : null,
-    canRefresh: fs.existsSync(CLAUDE_PROBE),
-  };
-}
-
-app.get('/api/dopa/claude', auth, ownerOnly, (req, res) => res.json({ ...claudeState(), job: lastClaudeJob() }));
-
-app.post('/api/dopa/claude/model', auth, ownerOnly, (req, res) => {
-  const model = str(req.body?.model, 20);
-  if (!CLAUDE_MODELS.some(m => m.id === model)) return res.status(400).json({ error: 'Unbekanntes Modell' });
-  const file = claudeSettingsFile();
-  const settings = readJSONFile(file);
-  if (!settings) return res.status(503).json({ error: 'Claude ist auf dem Server nicht eingerichtet' });
-  if (model === 'default') delete settings.model; else settings.model = model;
-  fs.writeFileSync(file + '.tmp', JSON.stringify(settings, null, 2));
-  fs.renameSync(file + '.tmp', file);
-  try {   // Datei soll dem Benutzer claude gehören, nicht root
-    const st = fs.statSync(path.dirname(file));
-    if (process.getuid && process.getuid() === 0) fs.chownSync(file, st.uid, st.gid);
-  } catch {}
-  res.json(claudeState());
-});
-
-let claudeProbe = null;
-app.post('/api/dopa/claude/refresh', auth, ownerOnly, async (req, res) => {
-  if (!fs.existsSync(CLAUDE_PROBE)) return res.status(503).json({ error: 'Aktualisieren geht hier nicht' });
-  claudeProbe = claudeProbe || new Promise(resolve =>
-    execFile(CLAUDE_PROBE, { timeout: 60000 }, () => resolve())).finally(() => { claudeProbe = null; });
-  await claudeProbe;
-  res.json(claudeState());
-});
-
-// ---------- Aufträge an Claude direkt aus Dopa (nur Besitzer, immer nur einer, max. 60 Min)
-// tools/server/dopa-claude-run startet `claude -p` per systemd-run als Benutzer claude; hier werden nur
-// Ordner angelegt und die Ausgabe (stream-json) für die App in kurze Ereignisse übersetzt.
-const CLAUDE_RUNNER = process.env.CLAUDE_RUNNER || '/usr/local/bin/dopa-claude-run';
-const jobsDir = () => path.join(CLAUDE_HOME, '.dopa-jobs');
-const JOB_ID = /^[a-z0-9-]+$/;
-
-function runRunner(args) {
-  return new Promise((resolve, reject) => {
-    const js = CLAUDE_RUNNER.endsWith('.js');
-    execFile(js ? process.execPath : CLAUDE_RUNNER, js ? [CLAUDE_RUNNER, ...args] : args, { timeout: 20000 },
-      (err, stdout, stderr) => err ? reject(new Error(String(stderr || err.message).slice(0, 200))) : resolve());
-  });
-}
-
-function shortTool(name, input = {}) {
-  const rel = p => String(p || '').replace(/^\/home\/claude\/momentum\//, '');
-  if (name === 'Bash') return str(input.description || input.command, 160);
-  if (['Read', 'Edit', 'Write', 'MultiEdit'].includes(name)) return rel(input.file_path);
-  if (name === 'Grep' || name === 'Glob') return str(input.pattern, 120);
-  if (name === 'WebSearch') return str(input.query, 120);
-  if (name === 'WebFetch') return str(input.url, 120);
-  if (name === 'TodoWrite') return 'Aufgabenliste';
-  return '';
-}
-
-function readJob(id) {
-  if (!JOB_ID.test(id)) return null;
-  const dir = path.join(jobsDir(), id);
-  const meta = readJSONFile(path.join(dir, 'meta.json'));
-  if (!meta) return null;
-  let lines = [];
-  try { lines = fs.readFileSync(path.join(dir, 'out.jsonl'), 'utf8').split('\n').filter(Boolean); } catch {}
-  const events = [{ kind: 'you', text: meta.prompt }];
-  let sessionId = null, result = null;
-  for (const line of lines) {
-    let m; try { m = JSON.parse(line); } catch { continue; }
-    if (m.session_id) sessionId = m.session_id;
-    if (m.type === 'assistant') {
-      for (const c of m.message?.content || []) {
-        if (c.type === 'text' && c.text.trim()) events.push({ kind: 'text', text: str(c.text, 4000) });
-        if (c.type === 'tool_use') events.push({ kind: 'tool', name: c.name, detail: shortTool(c.name, c.input) });
-      }
-    } else if (m.type === 'result') {
-      result = m;
-    }
-  }
-  const exitRaw = (() => { try { return fs.readFileSync(path.join(dir, 'exit'), 'utf8').trim(); } catch { return null; } })();
-  const stopped = fs.existsSync(path.join(dir, 'stopped'));
-  const tooOld = Date.now() - meta.startedAt > 65 * 60 * 1000;
-  let status = 'running';
-  if (stopped) status = 'stopped';
-  else if (result) status = result.is_error ? 'failed' : 'done';
-  else if (exitRaw !== null || tooOld) status = 'failed';
-  if (status === 'failed' && !result) {
-    let err = ''; try { err = fs.readFileSync(path.join(dir, 'err.log'), 'utf8').trim(); } catch {}
-    events.push({ kind: 'error', text: str(err || (tooOld ? 'Nach 60 Minuten abgebrochen.' : 'Claude hat sich ohne Ergebnis beendet.'), 600) });
-  }
-  if (status === 'stopped') events.push({ kind: 'error', text: 'Gestoppt.' });
-  return {
-    id, status, startedAt: meta.startedAt, resumed: !!meta.resume,
-    sessionId: sessionId || meta.resume || null,
-    minutes: result ? Math.round((result.duration_ms || 0) / 60000) : null,
-    events,
-  };
-}
-
-function jobIds() {
-  try { return fs.readdirSync(jobsDir()).filter(f => JOB_ID.test(f)).sort().reverse(); } catch { return []; }
-}
-
-function lastClaudeJob() {
-  const id = jobIds()[0];
-  const job = id && readJob(id);
-  return job ? { id: job.id, status: job.status, startedAt: job.startedAt } : null;
-}
-
-app.post('/api/dopa/claude/jobs', auth, ownerOnly, async (req, res) => {
-  const prompt = str(req.body?.prompt, 8000).trim();
-  if (!prompt) return res.status(400).json({ error: 'leer' });
-  if (!fs.existsSync(CLAUDE_RUNNER)) return res.status(503).json({ error: 'Claude ist auf dem Server nicht eingerichtet' });
-  const last = jobIds()[0] && readJob(jobIds()[0]);
-  if (last && last.status === 'running') return res.status(409).json({ error: 'Claude arbeitet noch am letzten Auftrag' });
-  const resume = req.body?.resume && last?.sessionId && /^[0-9a-f-]{36}$/.test(last.sessionId) ? last.sessionId : null;
-  const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
-  const dir = path.join(jobsDir(), id);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt);
-  if (resume) fs.writeFileSync(path.join(dir, 'resume'), resume);
-  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify({ prompt, resume, startedAt: Date.now() }));
-  for (const old of jobIds().slice(20)) fs.rmSync(path.join(jobsDir(), old), { recursive: true, force: true });
-  try {
-    await runRunner([dir]);
-  } catch (e) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    return res.status(500).json({ error: 'Start ging nicht: ' + e.message });
-  }
-  res.json(readJob(id));
-});
-
-app.get('/api/dopa/claude/jobs/:id', auth, ownerOnly, (req, res) => {
-  const job = readJob(req.params.id);
-  if (!job) return res.status(404).json({ error: 'nicht gefunden' });
-  const after = clamp(req.query.after ?? 0, 0, 100000);
-  res.json({ ...job, events: job.events.slice(after), next: job.events.length });
-});
-
-app.post('/api/dopa/claude/jobs/:id/stop', auth, ownerOnly, async (req, res) => {
-  const job = readJob(req.params.id);
-  if (!job) return res.status(404).json({ error: 'nicht gefunden' });
-  if (job.status === 'running') {
-    try { await runRunner(['--stop', path.join(jobsDir(), job.id)]); } catch (e) { return res.status(500).json({ error: e.message }); }
-  }
-  res.json(readJob(job.id));
-});
+// ---------- Claude auf dem Server: Projekte, Feedback, Aufträge, Limits (für die Claude-App) – siehe hub.js
+require('./hub')(app, { db, auth, express, str, clamp, RELEASE_DIR });
 
 app.get('/api/dopa/status', auth, (req, res) => {
   const b = db.prepare('SELECT updated_at FROM dopa_backups WHERE user_id=?').get(req.user.id);

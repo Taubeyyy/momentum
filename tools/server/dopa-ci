@@ -3,11 +3,17 @@
    (/var/www/momentum/releases), deshalb braucht es dafür keinen GitHub-Login.
      dopa-ci              letzter Build + Simulator-Rundgang (bei Fehlern mit Auszug aus dem Protokoll)
      dopa-ci --wait       wartet auf den nächsten Lauf (max. 9 Min, dann nochmal aufrufen)
-     dopa-ci --wait 41    wartet, bis Lauf 41 fertig ist                                            */
+     dopa-ci --wait 41    wartet, bis Lauf 41 fertig ist
+     dopa-ci --project fakester [--wait]   dasselbe für die Fakester-App (ohne Simulator-Rundgang)      */
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const DIR = '/var/www/momentum/releases';
+const argv = process.argv.slice(2);
+const pi = argv.indexOf('--project');
+const PROJECT = pi >= 0 ? argv.splice(pi, 2)[1] : 'dopa';
+if (!['dopa', 'fakester'].includes(PROJECT)) { console.log('Unbekanntes Projekt: ' + PROJECT); process.exit(1); }
+const HAS_UI = PROJECT === 'dopa';
+const DIR = '/var/www/momentum/releases' + (PROJECT === 'dopa' ? '' : '/' + PROJECT);
 
 const json = f => { try { return JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')); } catch { return null; } };
 const text = f => { try { return fs.readFileSync(path.join(DIR, f), 'utf8'); } catch { return ''; } };
@@ -15,7 +21,8 @@ const ago = at => at ? `vor ${Math.max(0, Math.round((Date.now() - at) / 60000))
 
 function state() {
   const rel = json('latest.json');                 // erfolgreicher Build: {build, notes, at}
-  const fail = json('ci-latest-build.json');       // fehlgeschlagener Build: {run, ok:false, at}
+  const failRaw = json('ci-latest-build.json');    // letzter gemeldeter Build: {run, ok, at}
+  const fail = failRaw && !failRaw.ok ? failRaw : null;
   const ui = json('ci-latest-ui.json');            // Simulator-Rundgang: {run, ok, at}
   const okRun = rel ? rel.build : 0;
   const failRun = fail ? fail.run : 0;
@@ -33,6 +40,7 @@ function report(s) {
     console.log(text(`ci-${b.run}-build.log`).split('\n').slice(0, 60).join('\n'));
   }
   const u = s.ui;
+  if (!HAS_UI) return;
   if (!u.run) console.log('Simulator-Rundgang: noch kein Ergebnis.');
   else {
     console.log(`Simulator-Rundgang ${u.run}: ${u.ok ? 'OK' : 'FEHLER'} (${ago(u.at)}) – ${DIR}/ci-${u.run}-ui.log`);
@@ -40,7 +48,7 @@ function report(s) {
   }
 }
 
-const args = process.argv.slice(2);
+const args = argv;
 if (args[0] !== '--wait') { report(state()); process.exit(0); }
 
 const start = state();
@@ -49,11 +57,11 @@ const until = Date.now() + 9 * 60 * 1000;
 console.log(`Warte auf Lauf ${target} …`);
 (function poll() {
   const s = state();
-  if (s.build.run >= target && s.ui.run >= target) { report(s); process.exit(s.build.ok && s.ui.ok ? 0 : 1); }
+  if (s.build.run >= target && (!HAS_UI || s.ui.run >= target)) { report(s); process.exit(s.build.ok && (!HAS_UI || s.ui.ok) ? 0 : 1); }
   if (s.build.run >= target && !s.build.ok) { report(s); process.exit(1); }   // Build kaputt → Rundgang egal
   if (Date.now() > until) {
     console.log(`Lauf ${target} ist noch nicht fertig (Build ${s.build.run >= target ? 'fertig' : 'läuft'}, ` +
-      `Rundgang ${s.ui.run >= target ? 'fertig' : 'läuft'}). Weiter warten: dopa-ci --wait ${target}`);
+      `Rundgang ${s.ui.run >= target ? 'fertig' : 'läuft'}). Weiter warten: dopa-ci${PROJECT === 'dopa' ? '' : ' --project ' + PROJECT} --wait ${target}`);
     process.exit(2);
   }
   setTimeout(poll, 15000);

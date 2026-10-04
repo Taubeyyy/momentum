@@ -29,9 +29,12 @@ Edwin schüttelt in der App das Handy oder tippt im Profil auf „Feedback an Cl
 8. Feedback abhaken: `sudo dopa-feedback --done <id> "Build <N>: was umgesetzt wurde"`.
 9. Edwin kurz Bescheid geben: was drin ist, Build-Nummer, „in der App auf Update tippen“. Offene Punkte ehrlich nennen.
 
-Aufträge kommen entweder über Remote Control (Claude-App → Code → „Dopa-Server“) oder direkt aus Dopa (Claude-Tab):
+Aufträge kommen meist aus Edwins eigener **Claude-App** (`ios/ClaudeApp`, Target `ClaudeRemote`, Server-Teil `hub.js`):
 dann läufst du headless per `tools/server/dopa-claude-run` (systemd-run, max. 60 Min, feste Werkzeug-Liste) und
-Edwin sieht deine Texte und Werkzeug-Aufrufe live in der App. Nachfragen geht dort nicht – Fragen ans Ende.
+Edwin sieht deine Texte und Werkzeug-Aufrufe live. Nachfragen geht dort nicht – Fragen ans Ende.
+Die Claude-App betreut mehrere Projekte: Dopa (dieses Repo, `/home/claude/momentum`) und die Fakester-iOS-App
+(`/home/claude/fakester-ios`, eigene CLAUDE.md). Sie baut im selben CI-Lauf mit (Job `claude-app`); wer `hub.js`
+oder die App ändert, hält beide Seiten passend.
 
 **GitHub-Actions-Minuten sind knapp** (4.10.: Build 67 blieb hängen – Kontingent leer; macOS-Minuten zählen 10-fach,
 jeder Push unter `ios/**` = Build + Simulator-Rundgang). Edwin will auf einen eigenen Runner umstellen. Bis dahin:

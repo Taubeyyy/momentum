@@ -159,59 +159,6 @@ final class Server: ObservableObject {
         try await call("/api/dopa/latest", auth: false)
     }
 
-    // Claude-Tab: Pro-Limits von Claude auf dem Server + Modell der Server-Sitzungen
-    struct ClaudeWindow: Decodable { let pct: Double; let resetsAt: Double }
-    struct ClaudeLimits: Decodable { let fiveHour: ClaudeWindow?; let week: ClaudeWindow?; let model: String?; let at: Double? }
-    struct ClaudeModel: Decodable, Identifiable { let id: String; let label: String; let hint: String }
-    struct ClaudeState: Decodable {
-        let installed: Bool
-        let model: String
-        let models: [ClaudeModel]
-        let limits: ClaudeLimits?
-        let canRefresh: Bool
-        var job: ClaudeJobRef?
-    }
-    struct ClaudeJobRef: Decodable { let id: String; let status: String; let startedAt: Double }
-    struct ClaudeEvent: Decodable { let kind: String; let text: String?; let name: String?; let detail: String? }
-    struct ClaudeJob: Decodable {
-        let id: String
-        let status: String          // running · done · failed · stopped
-        let startedAt: Double
-        let resumed: Bool
-        let sessionId: String?
-        let minutes: Int?
-        let events: [ClaudeEvent]
-        var running: Bool { status == "running" }
-    }
-    struct ClaudeJobBody: Encodable { let prompt: String; let resume: Bool }
-
-    /// Auftrag an Claude auf dem Server (läuft dort weiter, auch wenn die App zu ist).
-    func startClaudeJob(_ prompt: String, resume: Bool) async throws -> ClaudeJob {
-        try await call("/api/dopa/claude/jobs", method: "POST", body: ClaudeJobBody(prompt: prompt, resume: resume))
-    }
-
-    func claudeJob(_ id: String) async throws -> ClaudeJob {
-        try await call("/api/dopa/claude/jobs/\(id)")
-    }
-
-    func stopClaudeJob(_ id: String) async throws -> ClaudeJob {
-        try await call("/api/dopa/claude/jobs/\(id)/stop", method: "POST")
-    }
-    struct ClaudeModelBody: Encodable { let model: String }
-
-    func claudeState() async throws -> ClaudeState {
-        try await call("/api/dopa/claude")
-    }
-
-    func setClaudeModel(_ id: String) async throws -> ClaudeState {
-        try await call("/api/dopa/claude/model", method: "POST", body: ClaudeModelBody(model: id))
-    }
-
-    /// Fragt Claude auf dem Server kurz an (Haiku), damit die Limits frisch sind – dauert bis ~40 s.
-    func refreshClaude() async throws -> ClaudeState {
-        try await call("/api/dopa/claude/refresh", method: "POST")
-    }
-
     struct DayLines: Decodable {
         let briefing: String; let midday: String; let afternoon: String; let evening: String; let night: String
         let nudges: [String]; let meals: [String]

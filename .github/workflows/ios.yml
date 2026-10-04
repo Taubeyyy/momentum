@@ -103,6 +103,48 @@ jobs:
           curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/ci-log?run=${{ github.run_number }}&job=build&ok=0" \
             -H "X-Release-Secret: $RELEASE_SECRET" -H "Content-Type: text/plain" --data-binary @"$RUNNER_TEMP/ci.txt"
 
+  # Zweite App aus demselben Repo: die Claude-App (läuft parallel zu Dopa)
+  claude-app:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: brew install xcodegen ldid
+
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+
+      - name: Claude-App bauen (unsigniert)
+        run: |
+          xcodebuild -project Dopa.xcodeproj -scheme ClaudeRemote             -configuration Release -sdk iphoneos             -destination 'generic/platform=iOS'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""             MARKETING_VERSION=0.1.${{ github.run_number }}             CURRENT_PROJECT_VERSION=${{ github.run_number }}             build > "$RUNNER_TEMP/claude.log" 2>&1 || { grep -E "error:" "$RUNNER_TEMP/claude.log" | head -80; tail -40 "$RUNNER_TEMP/claude.log"; exit 1; }
+          tail -3 "$RUNNER_TEMP/claude.log"
+
+      - name: Mit ldid signieren + IPA packen
+        run: |
+          APP=build/Build/Products/Release-iphoneos/ClaudeRemote.app
+          ldid -SClaudeApp/ClaudeApp.entitlements -Icom.taubey.claude "$APP/ClaudeRemote"
+          mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          (cd out && zip -qry Claude.ipa Payload)
+          ls -lh out/Claude.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Claude-${{ github.run_number }}
+          path: ios/out/Claude.ipa
+
+      - name: Update auf den Server legen (Claude-App zeigt „Build N ist da“)
+        env:
+          RELEASE_SECRET: ${{ secrets.DOPA_RELEASE_SECRET }}
+        run: |
+          if [ -z "$RELEASE_SECRET" ]; then echo "kein Secret – übersprungen"; exit 0; fi
+          NOTES=$(git log -1 --pretty=%s | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()[:200]))')
+          curl -fsS -X PUT "https://dopa.taubey.com/api/dopa/release?build=${{ github.run_number }}&app=claude"             -H "X-Release-Secret: $RELEASE_SECRET" -H "X-Release-Notes: $NOTES"             -H "Content-Type: application/octet-stream" --data-binary @out/Claude.ipa
+
   # Tippt die App im Simulator durch und macht Fotos von jedem Bildschirm (für Claude zum Nachsehen)
   ui:
     runs-on: macos-15

@@ -36,7 +36,7 @@ struct DoSwitch: View {
     }
 }
 
-/// „Mehr“: was in der Bubble gewählt wurde – Geld, Schlaf, Dot, Claude oder Profil.
+/// „Mehr“: was in der Bubble gewählt wurde – Geld, Schlaf, Dot oder Profil.
 struct MorePage: View {
     @ObservedObject private var router = Router.shared
 
@@ -44,8 +44,6 @@ struct MorePage: View {
         switch router.moreItem {
         case .money:
             ShopView(mode: .money)              // hat eigene Navigation
-        case .claude:
-            ClaudeView()                        // hat eigene Navigation
         case .sleep:
             NavigationStack { SleepPage() }.id(MoreItem.sleep)
         case .dot:
@@ -56,7 +54,7 @@ struct MorePage: View {
     }
 }
 
-/// Kleine Bubble über „Mehr“: fünf Ziele, ein Tipp. Daneben tippen schließt sie.
+/// Kleine Bubble über „Mehr“: vier Ziele, ein Tipp. Daneben tippen schließt sie.
 struct MoreBubble: View {
     let onPick: (MoreItem) -> Void
     let onClose: () -> Void

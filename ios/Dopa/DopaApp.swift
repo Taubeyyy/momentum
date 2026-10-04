@@ -75,20 +75,14 @@ final class Router: ObservableObject {
 
     var tabName: String { tab == .more ? moreItem.title : tab == .tasks && doSection == .plan ? "Plan" : tab.title }
 
-    /// Ist die Claude-Seite gerade sichtbar? (liegt jetzt unter „Mehr“)
-    var claudeVisible: Bool { tab == .more && moreItem == .claude }
-
     /// Tab wechseln – mit derselben weichen Bewegung wie die Leiste.
-    /// Plan liegt jetzt unter „Machen“, Claude unter „Mehr“ – alte Ziele werden umgeleitet.
+    /// Plan liegt jetzt unter „Machen“ – das alte Ziel wird umgeleitet.
     func go(_ tab: AppTab) {
         var target = tab
         switch tab {
         case .day:
             doSection = .plan
             target = .tasks
-        case .claude:
-            moreItem = .claude
-            target = .more
         default:
             break
         }
@@ -119,8 +113,6 @@ final class Router: ObservableObject {
         case "einkauf":
             shopSection = .list
             go(.shop)
-        case "claude":
-            go(.claude)
         case "geld":
             showMore(.money)
         case "schlaf":
@@ -352,7 +344,6 @@ struct RootView: View {
         case .day: EmptyView()          // liegt unter „Machen“
         case .memo: MemoView(focusRequest: router.memoFocusRequest)
         case .shop: ShopView(mode: .list)
-        case .claude: EmptyView()       // liegt unter „Mehr“
         case .more: MorePage()
         }
     }
