@@ -15,11 +15,12 @@ enum MemoPhotos {
         return url
     }
 
-    /// Speichert Foto + Vorschau, gibt den Dateinamen zurück.
+    /// Speichert Foto + Vorschau, gibt den Dateinamen zurück. Seit Build 105 in hoher Auflösung
+    /// (Zettel und Tafeln sollen beim Reinzoomen lesbar bleiben), Vorschau scharf auf dem Retina-Display.
     static func save(_ image: UIImage) -> String? {
         let name = UUID().uuidString + ".jpg"
-        guard let full = resized(image, maxSide: 1600).jpegData(compressionQuality: 0.75),
-              let thumb = resized(image, maxSide: 240).jpegData(compressionQuality: 0.7) else { return nil }
+        guard let full = resized(image, maxSide: 2800).jpegData(compressionQuality: 0.85),
+              let thumb = resized(image, maxSide: 480).jpegData(compressionQuality: 0.75) else { return nil }
         do {
             try full.write(to: folder.appendingPathComponent(name), options: .atomic)
             try thumb.write(to: folder.appendingPathComponent(thumbName(name)), options: .atomic)

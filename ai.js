@@ -510,6 +510,12 @@ const DUMP_RULES = `Sortiere ALLES ein:
   Was im Zeitplan steht, NICHT zusätzlich in "tasks" oder "reminders".
 - "summary": ein kurzer Satz, was du einsortiert hast.
 
+Aufträge von anderen sind Aufgaben für die Person: "Frau M. sagt, ich soll bis Freitag 20 Kopien machen",
+"Lehrerin will das Plakat fertig", "Chef: Liste bis Montag" → task mit Frist als "day"; wer es wollte, kurz in den
+title ("Kopien für Frau M."). Umgangssprache, Tippfehler und Abkürzungen wohlwollend verstehen (zhs = zu Hause,
+Kl. 3b = Klasse 3b, AB = Arbeitsblatt, AG, Elternbrief …). Bei Unklarem lieber eine schlichte Aufgabe mit den
+eigenen Worten der Person als gar nichts.
+
 Nichts erfinden. Was in keine Kategorie passt (Gefühle, Gelaber), weglassen.
 Dasselbe nicht doppelt: eine Aufgabe mit Uhrzeit ist eine Erinnerung, keine Aufgabe.`;
 
@@ -567,16 +573,25 @@ Bei einem Brief mit Frist: eine Aufgabe mit passendem "day".`,
 }
 
 /* Notiz-Foto: kurzer Satz, was drauf ist – spart das Tippen. */
-async function photoCaption({ image, mime }) {
+async function photoCaption({ image, mime, todayLabel }) {
   return ask({
-    system: `Beschreibe das Foto für eine Merk-Notiz in EINEM kurzen deutschen Satz (max. 8 Wörter),
+    system: `Beschreibe das Foto für eine Merk-Notiz in EINEM kurzen deutschen Satz (max. 12 Wörter),
 so dass man es später per Suche findet. Wenn ein Gegenstand irgendwo liegt: "Schlüssel liegt auf der Kommode".
-Wenn etwas erledigt aussieht (Herd aus, Tür zu): "Herd ist aus". Sonst: was drauf steht oder zu sehen ist.
-"kind": place (wo etwas liegt), done (etwas ist erledigt/aus/zu), agreement (Absprache/Zettel von jemandem), note (sonst).`,
-    user: 'Was ist auf dem Foto?',
-    schema: obj({ caption: { type: 'string' }, kind: { type: 'string', enum: ['place', 'done', 'agreement', 'note'] } }),
+Wenn etwas erledigt aussieht (Herd aus, Tür zu): "Herd ist aus". Steht Text drauf (Zettel, Tafel, Arbeitsblatt,
+Handschrift): lies ihn genau und fasse das Wichtigste zusammen.
+"kind": place (wo etwas liegt), done (etwas ist erledigt/aus/zu), agreement (Absprache/Auftrag/Zettel von jemandem), note (sonst).
+"task": Steht drauf, dass die Person etwas TUN soll (Auftrag einer Lehrkraft oder vom Chef, Frist, „bitte bis …“,
+Arbeitsblatt kopieren, Material vorbereiten), dann die Aufgabe kurz (max. 6 Wörter, wer es will darf rein:
+"Kopien für Frau M."). Sonst "". "day": Frist als Tage ab heute (0 heute, 1 morgen … 13), ohne Frist -1.`,
+    user: `Heute ist ${todayLabel}. Was ist auf dem Foto?`,
+    schema: obj({
+      caption: { type: 'string' },
+      kind: { type: 'string', enum: ['place', 'done', 'agreement', 'note'] },
+      task: { type: 'string' },
+      day: { type: 'integer' }
+    }),
     media: [{ kind: 'image', mime, data: image }],
-    maxTokens: 120
+    maxTokens: 260
   });
 }
 

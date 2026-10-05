@@ -817,9 +817,11 @@ app.post('/api/dopa/photo/caption', auth, aiLimit, async (req, res) => {
   const media = mediaImage(req.body);
   if (!media) return res.status(400).json({ error: 'kein Bild' });
   try {
-    const { data, provider } = await ai.photoCaption(media);
+    const { data, provider } = await ai.photoCaption({ ...media, todayLabel: berlinLabel() });
     const kind = ['place', 'done', 'agreement', 'note'].includes(data.kind) ? data.kind : 'note';
-    res.json({ caption: str(data.caption, 100).trim(), kind, provider });
+    // Auftrag auf dem Foto (z. B. Zettel einer Lehrkraft) → Vorschlag „Auch als Aufgabe?“
+    const day = Number.isInteger(data.day) ? clamp(data.day, -1, 13) : -1;
+    res.json({ caption: str(data.caption, 140).trim(), kind, task: str(data.task, 80).trim(), day, provider });
   } catch (e) { aiFail(res, e); }
 });
 

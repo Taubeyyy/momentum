@@ -176,6 +176,18 @@ final class Store: ObservableObject {
         data.tasks.filter { task in task.doneAt.map { Calendar.current.isDateInToday($0) } ?? false }
     }
 
+    /// Aufgabe mit Frist (Tage ab heute; ≤ 0 = heute) – z. B. ein Auftrag aus „Merken“.
+    func addTask(_ title: String, day: Int) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        var task = TaskItem(title: title, firstStep: Smart.firstStep(for: title))
+        if day > 0 {
+            task.dueDay = Calendar.current.date(byAdding: .day, value: day, to: Calendar.current.startOfDay(for: Date()))
+        }
+        data.tasks.insert(task, at: 0)
+        save()
+    }
+
     func addTask(_ title: String) {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }

@@ -51,6 +51,18 @@ enum MemoKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+extension Smart {
+    /// Klingt eine Notiz nach einem Auftrag (von einer Lehrkraft, vom Chef …)? Dann bietet „Merken“
+    /// zusätzlich „Auch als Aufgabe?“ an. Nur ein Vorfilter – was genau, entscheidet die KI.
+    static func looksLikeAssignment(_ text: String) -> Bool {
+        let t = " " + text.lowercased() + " "
+        let cues = [" soll ", " sollen ", " muss ", " müssen ", " bis ", " bitte ", " vorbereiten", " kopieren",
+                    " kopien", " ausdrucken", " mitbringen", " abgeben", " fertig machen", " erledigen", " machen bis",
+                    " will, dass", " möchte, dass", " auftrag", " für morgen", " bis morgen"]
+        return cues.contains { t.contains($0) }
+    }
+}
+
 enum Smart {
     static func containsAny(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0) }

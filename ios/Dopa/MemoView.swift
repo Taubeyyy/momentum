@@ -15,7 +15,13 @@ struct MemoView: View {
     @State private var choosingSource = false
     @State private var showCamera = false
     @State private var showLibrary = false
+    @State private var taskIdea: TaskIdea?      // „Auch als Aufgabe?“ – Auftrag aus Notiz oder Foto
     @FocusState private var inputFocused: Bool
+
+    private struct TaskIdea: Equatable {
+        let title: String
+        let day: Int                            // Tage ab heute, -1 = ohne Frist
+    }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var currentKind: MemoKind { chosenKind ?? MemoKind.detect(trimmed) }
@@ -62,6 +68,12 @@ struct MemoView: View {
                 }
                 .sheet(isPresented: $showLibrary) {
                     LibraryPicker { image in setPhoto(image) }.ignoresSafeArea()
+                }
+
+                if let idea = taskIdea {
+                    taskIdeaCard(idea)
+                        .padding(.top, 10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 if !trimmed.isEmpty {
@@ -116,6 +128,51 @@ struct MemoView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { inputFocused = true }
     }
 
+    /// Vorschlag unter dem Eingabefeld: Auftrag (z. B. von einer Lehrkraft) gleich als Aufgabe mit Frist anlegen.
+    private func taskIdeaCard(_ idea: TaskIdea) -> some View {
+        let when: String = idea.day < 0 ? "" : idea.day == 0 ? " · heute" : idea.day == 1 ? " · morgen"
+            : " · " + DotChat.dayLabel(idea.day, from: Date())
+        return HStack(spacing: 10) {
+            Image(systemName: "checklist")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(store.theme.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("AUCH ALS AUFGABE?").font(.system(size: 10, weight: .heavy)).tracking(0.7).foregroundStyle(DS.purpleMuted)
+                Text(idea.title + when).font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.ink).lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            Button("Übernehmen") {
+                store.addTask(idea.title, day: idea.day)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                Toaster.shared.show("Aufgabe angelegt")
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { taskIdea = nil }
+            }
+            .buttonStyle(PillButtonStyle(prominent: true))
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) { taskIdea = nil }
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(DS.faint)
+                    .frame(width: 28, height: 28).contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Kein Auftrag")
+        }
+        .padding(12)
+        .background(DS.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(store.theme.accent.opacity(0.4)))
+    }
+
+    /// Getippte Notiz klingt nach Auftrag → KI (Smart Dump) fragen, ob und bis wann eine Aufgabe daraus wird.
+    private func suggestTask(from text: String) {
+        guard Smart.looksLikeAssignment(text), Server.shared.isConnected, Server.shared.aiAvailable else { return }
+        Task {
+            guard let result = try? await Server.shared.dump(text), let first = result.tasks.first else { return }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                taskIdea = TaskIdea(title: first.title, day: first.day)
+            }
+        }
+    }
+
     private func save() {
         if let photo = pendingPhoto {
             // Foto geht auch ohne Text – dann ist es meistens ein Ort
@@ -128,6 +185,8 @@ struct MemoView: View {
         } else {
             guard !trimmed.isEmpty else { return }
             store.addMemo(trimmed, kind: chosenKind)
+            withAnimation(.easeOut(duration: 0.2)) { taskIdea = nil }   // alter Vorschlag weg, ggf. kommt ein neuer
+            suggestTask(from: trimmed)
         }
         text = ""
         chosenKind = nil
@@ -137,20 +196,30 @@ struct MemoView: View {
     }
 
     private func setPhoto(_ image: UIImage) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { pendingPhoto = image }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            pendingPhoto = image
+            taskIdea = nil
+        }
         // Gemini schlägt vor, was drauf ist – du musst nur noch „Merken“ tippen
         guard Server.shared.isConnected, Server.shared.aiAvailable,
-              let encoded = MediaUpload.jpegBase64(image, maxSide: 1000, quality: 0.6) else {
+              let encoded = MediaUpload.jpegBase64(image, maxSide: 1600, quality: 0.75) else {   // groß genug für Handschrift
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { inputFocused = true }
             return
         }
         suggesting = true
         Task {
-            if let result = try? await Server.shared.photoCaption(encoded), pendingPhoto != nil,
-               text.trimmingCharacters(in: .whitespaces).isEmpty {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    text = result.caption
-                    chosenKind = MemoKind(rawValue: result.kind)
+            if let result = try? await Server.shared.photoCaption(encoded), pendingPhoto != nil {
+                if text.trimmingCharacters(in: .whitespaces).isEmpty {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        text = result.caption
+                        chosenKind = MemoKind(rawValue: result.kind)
+                    }
+                }
+                // Auftrag auf dem Foto (Zettel einer Lehrkraft …) → „Auch als Aufgabe?“
+                if let task = result.task, !task.isEmpty {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        taskIdea = TaskIdea(title: task, day: result.day ?? -1)
+                    }
                 }
             }
             suggesting = false

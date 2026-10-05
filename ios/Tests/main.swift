@@ -29,6 +29,11 @@ for (text, kind) in memoCases {
     expect(MemoKind.detect(text), kind, "MemoKind(\(text))")
 }
 
+// Aufträge auf „Merken“ (Lehrkraft, Chef …) – Vorfilter für „Auch als Aufgabe?“
+expect(Smart.looksLikeAssignment("Frau M. sagt, ich soll bis Freitag 20 Kopien machen"), true, "Auftrag erkannt")
+expect(Smart.looksLikeAssignment("Plakat für die 3b vorbereiten"), true, "Vorbereiten ist ein Auftrag")
+expect(Smart.looksLikeAssignment("Schlüssel liegt auf der Kommode"), false, "Ort ist kein Auftrag")
+
 // Erster Schritt
 expect(Smart.firstStep(for: "Zimmer aufräumen"), "Nur 5 Sachen an ihren Platz legen", "Schritt Zimmer")
 expect(Smart.firstStep(for: "Arzttermin machen"), "Nur die Nummer oder Website raussuchen", "Schritt Arzt")

@@ -114,7 +114,12 @@ final class Server: ObservableObject {
         try await call("/api/dopa/photo/dump", method: "POST", body: ImageBody(image: image, hint: hint))
     }
 
-    struct Caption: Decodable { let caption: String; let kind: String }
+    struct Caption: Decodable {
+        let caption: String
+        let kind: String
+        let task: String?           // Auftrag auf dem Foto (z. B. Zettel einer Lehrkraft) → „Auch als Aufgabe?“
+        let day: Int?               // Frist in Tagen ab heute, -1 = keine
+    }
 
     /// Notiz-Foto → kurzer Satz, was drauf ist.
     func photoCaption(_ image: String) async throws -> Caption {

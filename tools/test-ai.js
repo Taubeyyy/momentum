@@ -65,7 +65,10 @@ ai.photoDump = async ({ hint }) => ({
     reminders: [], shopping: ['Milch', 'Eier', ''], notes: hint ? [hint] : [], schedule: [] },
   provider: 'test'
 });
-ai.photoCaption = async () => ({ data: { caption: 'Schlüssel liegt auf der Kommode', kind: 'quatsch' }, provider: 'test' });
+ai.photoCaption = async ({ todayLabel }) => ({
+  data: { caption: 'Schlüssel liegt auf der Kommode', kind: 'quatsch', task: todayLabel ? 'Kopien für Frau M.' : '', day: 99 },
+  provider: 'test'
+});
 ai.moneyScan = async () => ({
   data: {
     entries: [{ title: 'Lidl', amount: -23.456, income: false, date: '2026-10-01' }, { title: 'Oma', amount: 20, income: true, date: 'gestern' },
@@ -366,6 +369,7 @@ function check(name, cond, extra) {
   check('photo/dump ohne gültiges Bild → 400', pdBad.status === 400, pdBad);
   const cap = await app('POST', '/api/dopa/photo/caption', { image: img });
   check('photo/caption: Satz + unbekannte Art wird note', cap.body.caption === 'Schlüssel liegt auf der Kommode' && cap.body.kind === 'note', cap.body);
+  check('photo/caption: Auftrag vom Foto mit begrenzter Frist', cap.body.task === 'Kopien für Frau M.' && cap.body.day === 13, cap.body);
   const scan = await app('POST', '/api/dopa/money/scan', { image: img, known: 'Lidl 23,46' });
   check('money/scan: Beträge positiv/gerundet, Unsinn raus, Raten begrenzt, max 3 Tipps',
     scan.body.entries?.length === 2 && scan.body.entries[0].amount === 23.46 && scan.body.entries[1].income === true
