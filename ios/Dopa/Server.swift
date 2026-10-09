@@ -278,6 +278,7 @@ final class Server: ObservableObject {
         let items: [String]?
         let entries: [ChatEntry]?
         let place: String?
+        let key: String?            // bei „edit“: was geändert wird
     }
     struct ChatReply: Decodable {
         let answer: String

@@ -739,6 +739,17 @@ Vorschläge zum Antippen ("actions", höchstens 4, oft keine):
   halfway (Timer-Halbzeit). step = "off" oder "on". Bei morning/evening + off: day = wie viele Tage Pause
   („diese Woche“ = bis nächsten Montag, aus „Jetzt“ ausrechnen; ohne Angabe 7). Den aktuellen Stand siehst du
   unter „Einstellungen“ – nichts vorschlagen, was schon so ist.
+- edit = die App anpassen (alles, was unter „Morgen-Check“, „Abendroutine“, „Essens-Erinnerung“, „Gewohnheiten“,
+  „Eigene Erinnerungen“, „Farbe“ im Kontext steht, plus Aufgaben und Einkaufsliste). key = einer von:
+  morning.leave (time) · morning.days (items Wochentage: "Mo","Di"… oder "werktags"/"täglich") · morning.add (step = Schritt,
+  minutes) · morning.remove (step = Schritt) · evening.bed (time) · evening.days · evening.add · evening.remove ·
+  meals.times (items ["12:30","18:00"]) · nudges.window (items [von, bis], minutes = alle X Min) ·
+  reminder.time (title = Erinnerung, time) · reminder.delete (title) · habit.add (step = Name, time optional, minutes = pro Tag) ·
+  habit.remove (title) · habit.time (title, time; "" = ohne Erinnerung) · task.rename (title = alt, step = neu) ·
+  task.delete (title) · task.plan (title, day; -1 = irgendwann) · task.time (title, time, day) · shop.remove (title) ·
+  timer.presets (items ["5","15","25"]) · snooze (minutes) · theme (step = Name einer freien Farbe) · dot.name (step).
+  Bei title immer GENAU den Namen aus dem Kontext. Mehrere Änderungen = mehrere edit-Vorschläge (max. 4).
+  Zum An-/Ausschalten und Pausieren weiter „setting“ nehmen.
 - schedule = mehrere Termine auf einmal eintragen (z. B. Wochenplan vom Foto): title = kurzer Name ("Seminarwoche"),
   entries = je Termin {title, day, time "HH:MM", minutes Dauer}. day = Tage ab heute (siehe „Jetzt“ mit Wochentag) –
   „nächste Woche Montag“ also richtig ausrechnen, max. 13. Nur Termine mit Uhrzeit, nichts erfinden.
@@ -757,7 +768,8 @@ die sie als Nächstes sagen könnte, z. B. "Noch kleiner bitte", "Okay, ich fang
       actions: {
         type: 'array', maxItems: 4,
         items: obj({
-          kind: { type: 'string', enum: ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting'] },
+          kind: { type: 'string', enum: ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting', 'edit'] },
+          key: { type: 'string' },
           title: { type: 'string' },
           step: { type: 'string' },
           time: { type: 'string' },

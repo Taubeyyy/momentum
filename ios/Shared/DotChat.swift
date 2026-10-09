@@ -11,6 +11,7 @@ struct DotAction: Codable, Identifiable, Hashable {
         case steps                      // Schritte an eine bestehende Aufgabe hängen
         case schedule                   // mehrere Termine auf einmal (z. B. Wochenplan vom Foto)
         case setting                    // App einstellen: title = DotSetting, step = "on"/"off", day = Pause in Tagen
+        case edit                       // App anpassen: key = DotEdit (Routinen, Gewohnheiten, Aufgaben, Look …)
     }
 
     var id = UUID()
@@ -24,9 +25,11 @@ struct DotAction: Codable, Identifiable, Hashable {
     var items: [String] = []    // Schritte (bei „steps“ und bei neuen Aufgaben)
     var entries: [PlanEntry] = [] // Termine (bei „schedule“)
     var place = ""                // Ort (bei Aufgaben): erinnern beim Ankommen
+    var key = ""                  // bei „edit“: was geändert wird (DotEdit)
 
     init(kind: Kind, title: String, step: String = "", minutes: Int = 0, time: Int? = nil, day: Int = 0,
-         items: [String] = [], entries: [PlanEntry] = [], place: String = "") {
+         items: [String] = [], entries: [PlanEntry] = [], place: String = "", key: String = "") {
+        self.key = key
         self.kind = kind
         self.title = title
         self.step = step
@@ -57,6 +60,8 @@ struct DotAction: Codable, Identifiable, Hashable {
             return "\(title) eintragen · \(entryCount)"
         case .setting:
             return DotSetting(rawValue: title)?.label(on: step == "on", days: day) ?? "Einstellung ändern"
+        case .edit:
+            return DotEdit.label(self)
         case .reminder:
             let clock: String = time.map { " " + DotChat.clock($0) } ?? ""
             return "Erinnerung\(when)\(clock) · \(title)"
@@ -85,6 +90,7 @@ struct DotAction: Codable, Identifiable, Hashable {
         case .steps: "list.bullet.indent"
         case .schedule: "calendar.badge.plus"
         case .setting: "slider.horizontal.3"
+        case .edit: "wand.and.stars"
         }
     }
 
@@ -101,6 +107,7 @@ struct DotAction: Codable, Identifiable, Hashable {
         case .steps: "Schritte stehen bei „\(title)“"
         case .schedule: "\(entryCount) stehen im Plan"
         case .setting: "Eingestellt: " + label
+        case .edit: "Geändert: " + label
         }
     }
 }
@@ -200,6 +207,7 @@ extension DotAction {
         items = (try? c.decodeIfPresent([String].self, forKey: .items)) ?? []
         entries = (try? c.decodeIfPresent([PlanEntry].self, forKey: .entries)) ?? []
         place = (try? c.decodeIfPresent(String.self, forKey: .place)) ?? ""
+        key = (try? c.decodeIfPresent(String.self, forKey: .key)) ?? ""
     }
 }
 

@@ -100,7 +100,9 @@ ai.dotChat = async ({ name, context, history, message, media }) => ({
     actions: message.includes('Morgen-Check') ? [
       { kind: 'setting', title: 'morning', step: 'off', time: '', day: 3, minutes: 0 },
       { kind: 'setting', title: 'quatsch', step: 'off', time: '', day: 0, minutes: 0 },
-      { kind: 'setting', title: 'nudges', step: 'vielleicht', time: '', day: 0, minutes: 0 }
+      { kind: 'setting', title: 'nudges', step: 'vielleicht', time: '', day: 0, minutes: 0 },
+      { kind: 'edit', key: 'morning.leave', title: '', step: '', time: '7:45', day: 0, minutes: 0 },
+      { kind: 'edit', key: 'rm.rf', title: 'x', step: '', time: '', day: 0, minutes: 0 }
     ] : [
       { kind: 'reminder', title: 'Oma anrufen', step: '', time: '9:30', day: 1, minutes: 0, place: '  Zuhause ' },
       { kind: 'reminder', title: 'ohne Zeit', step: '', time: 'später', day: 0, minutes: 0 },
@@ -423,6 +425,9 @@ function check(name, cond, extra) {
   const settings = (settingChat.body.actions || []).filter(a => a.kind === 'setting');
   check('Dot-Chat: Einstellung durch, unbekannte fliegt raus',
     settings.length === 1 && settings[0].title === 'morning' && settings[0].day === 3, settingChat.body.actions);
+  const edits = (settingChat.body.actions || []).filter(a => a.kind === 'edit');
+  check('Dot-Chat: Anpassung durch (auch ohne title), unbekannter Schlüssel fliegt raus',
+    edits.length === 1 && edits[0].key === 'morning.leave' && edits[0].time === '07:45', settingChat.body.actions);
   check('Dot-Chat: Werte begrenzt', chat.body.actions?.[1]?.day === 13 && chat.body.actions[1].minutes === 90, chat.body.actions);
   check('Dot-Chat: höchstens 3 Antworten zum Antippen', chat.body.suggestions?.length === 3 && !chat.body.suggestions.includes(''), chat.body.suggestions);
   const photoChat = await app('POST', '/api/dopa/chat', {

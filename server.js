@@ -727,7 +727,12 @@ app.post('/api/dopa/chat', auth, aiLimit, async (req, res) => {
   } catch (e) { aiFail(res, e); }
 });
 
-const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting'];
+const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting', 'edit'];
+// Was Dot an der App ändern darf (kind „edit“, Feld key) – gleiche Liste wie DotEdit in der App
+const DOT_EDITS = ['morning.leave', 'morning.days', 'morning.add', 'morning.remove', 'evening.bed', 'evening.days',
+  'evening.add', 'evening.remove', 'meals.times', 'nudges.window', 'reminder.time', 'reminder.delete', 'habit.add',
+  'habit.remove', 'habit.time', 'task.rename', 'task.delete', 'task.plan', 'task.time', 'shop.remove',
+  'timer.presets', 'snooze', 'theme', 'dot.name'];
 // Was Dot in der App einstellen darf (kind „setting“): title = einer davon, step = on/off
 const DOT_SETTINGS = ['morning', 'evening', 'nudges', 'meals', 'briefing', 'review', 'countdown', 'halfway'];
 
@@ -749,10 +754,12 @@ function cleanDotChat(data) {
     minutes: clamp(Number.isInteger(a?.minutes) && a.minutes > 0 ? a.minutes : 10, 1, 90),
     items: (Array.isArray(a?.items) ? a.items : []).map(s => str(s, 80).trim()).filter(Boolean).slice(0, 15),
     entries: entries(a?.entries),
-    place: str(a?.place, 60).trim()       // Ort: Aufgabe meldet sich beim Ankommen
-  })).filter(a => a.kind && a.title && (a.kind !== 'reminder' || a.time) && (a.kind !== 'steps' || a.items.length)
+    place: str(a?.place, 60).trim(),      // Ort: Aufgabe meldet sich beim Ankommen
+    key: str(a?.key, 40).trim()           // edit: was geändert wird
+  })).filter(a => a.kind && (a.title || a.kind === 'edit') && (a.kind !== 'reminder' || a.time) && (a.kind !== 'steps' || a.items.length)
     && (a.kind !== 'schedule' || a.entries.length)
-    && (a.kind !== 'setting' || (DOT_SETTINGS.includes(a.title) && ['on', 'off'].includes(a.step))))
+    && (a.kind !== 'setting' || (DOT_SETTINGS.includes(a.title) && ['on', 'off'].includes(a.step)))
+    && (a.kind !== 'edit' || DOT_EDITS.includes(a.key)))
     .slice(0, 4);
   const suggestions = (Array.isArray(data?.suggestions) ? data.suggestions : [])
     .map(s => str(s, 60).trim()).filter(Boolean).slice(0, 3);

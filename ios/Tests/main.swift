@@ -46,6 +46,19 @@ expect(DotSetting.nudges.label(on: false, days: 0), "Stupser aus", "Stupser aus"
 expect(DotSetting.morning.label(on: true, days: 0), "Morgen-Check wieder an", "wieder an")
 expect(DotAction(kind: .setting, title: "nudges", step: "off").label, "Stupser aus", "Einstellungs-Knopf")
 
+// Dot passt die App an (edit)
+expect(DotEdit.weekdays(["Mo", "Mittwoch", "fr"]), [2, 4, 6], "Wochentage aus Wörtern")
+expect(DotEdit.weekdays(["werktags"]), [2, 3, 4, 5, 6], "werktags")
+expect(DotEdit.weekdayText([2, 3, 4, 5, 6]), "Mo–Fr", "Mo–Fr als Text")
+expect(DotEdit.weekdayText([1, 2, 4]), "Mo, Mi, So", "Woche ab Montag")
+expect(DotAction(kind: .edit, title: "", time: 465, key: "morning.leave").label, "Morgens los um 7:45", "Losgehzeit")
+expect(DotAction(kind: .edit, title: "Mails", step: "Mails beantworten", key: "task.rename").label,
+       "„Mails“ → „Mails beantworten“", "Aufgabe umbenennen")
+expect(DotAction(kind: .edit, title: "", items: ["Mo", "Di", "Do"], key: "morning.days").label,
+       "Morgen-Check Mo, Di, Do", "Morgen-Tage")
+expect(DotAction(kind: .edit, title: "", step: "Grün", key: "theme").label, "Farbe: Grün", "Farbe")
+expect(DotAction(kind: .edit, title: "x", key: "quatsch").label, "Einstellung ändern", "unbekannt")
+
 // Kontostand vom Screenshot
 let oldData = try! JSONDecoder().decode(AppData.self, from: #"{"tasks":[]}"#.data(using: .utf8)!)
 expect(oldData.bank == nil, true, "ohne Kontostand lesbar")

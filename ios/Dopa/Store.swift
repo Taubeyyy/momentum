@@ -1462,6 +1462,132 @@ final class Store: ObservableObject {
         save()
     }
 
+    /// Dot passt die App an (Vorschlag „edit“). Findet er das Ding nicht, sagt er's und ändert nichts.
+    private func applyEdit(_ a: DotAction) -> Bool {
+        guard let edit = DotEdit(rawValue: a.key) else { return false }
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: Date())
+        let missing: () -> Bool = {
+            Toaster.shared.show("„\(a.title.isEmpty ? a.step : a.title)“ find ich nicht")
+            return false
+        }
+        let open = openTasks
+        let taskID: UUID? = DotChat.match(a.title, in: open.map(\.title)).map { open[$0].id }
+        var s = data.reminders
+        let m = data.morning
+        let e = data.evening
+
+        switch edit {
+        case .morningLeave:
+            guard let time = a.time else { return false }
+            updateMorningPlan(steps: m.steps, leaveAt: time, days: m.days)
+        case .morningDays:
+            let days = DotEdit.weekdays(a.items)
+            guard !days.isEmpty else { return false }
+            updateMorningPlan(steps: m.steps, leaveAt: m.leaveAt, days: days)
+        case .morningAdd:
+            guard !a.step.isEmpty else { return false }
+            updateMorningPlan(steps: m.steps + [RoutineStep(title: a.step, minutes: a.minutes > 0 ? a.minutes : 3)],
+                              leaveAt: m.leaveAt, days: m.days)
+        case .morningRemove:
+            guard let i = DotChat.match(a.step.isEmpty ? a.title : a.step, in: m.steps.map(\.title)) else { return missing() }
+            var steps = m.steps
+            steps.remove(at: i)
+            updateMorningPlan(steps: steps, leaveAt: m.leaveAt, days: m.days)
+        case .eveningBed:
+            guard let time = a.time else { return false }
+            updateEveningPlan(steps: e.steps, bedAt: time, days: e.days)
+        case .eveningDays:
+            let days = DotEdit.weekdays(a.items)
+            guard !days.isEmpty else { return false }
+            updateEveningPlan(steps: e.steps, bedAt: e.bedAt, days: days)
+        case .eveningAdd:
+            guard !a.step.isEmpty else { return false }
+            updateEveningPlan(steps: e.steps + [RoutineStep(title: a.step, minutes: a.minutes > 0 ? a.minutes : 3)],
+                              bedAt: e.bedAt, days: e.days)
+        case .eveningRemove:
+            guard let i = DotChat.match(a.step.isEmpty ? a.title : a.step, in: e.steps.map(\.title)) else { return missing() }
+            var steps = e.steps
+            steps.remove(at: i)
+            updateEveningPlan(steps: steps, bedAt: e.bedAt, days: e.days)
+        case .mealTimes:
+            let times: [Int] = a.items.compactMap { DotChat.parseTime($0) }
+            guard !times.isEmpty else { return false }
+            s.mealTimes = times.sorted()
+            s.mealsOn = true
+            updateReminders(s)
+        case .nudgeWindow:
+            let times: [Int] = a.items.compactMap { DotChat.parseTime($0) }
+            guard times.count >= 2 else { return false }
+            s.nudgeFrom = times[0]
+            s.nudgeTo = times[1]
+            if a.minutes > 0 { s.nudgeEvery = max(15, a.minutes) }
+            s.nudgeOn = true
+            updateReminders(s)
+        case .reminderTime:
+            guard let time = a.time else { return false }
+            guard let i = DotChat.match(a.title, in: s.custom.map(\.title)) else { return missing() }
+            var reminder = s.custom[i]
+            reminder.minutes = time
+            saveReminder(reminder)
+        case .reminderDelete:
+            guard let i = DotChat.match(a.title, in: s.custom.map(\.title)) else { return missing() }
+            deleteReminder(s.custom[i].id)
+        case .habitAdd:
+            guard !a.step.isEmpty else { return false }
+            saveHabit(Habit(title: a.step, symbol: "checkmark", perDay: a.minutes > 0 ? min(12, a.minutes) : 1,
+                            remindAt: a.time))
+        case .habitRemove:
+            guard let i = DotChat.match(a.title, in: data.habits.map(\.title)) else { return missing() }
+            deleteHabit(data.habits[i].id)
+        case .habitTime:
+            guard let i = DotChat.match(a.title, in: data.habits.map(\.title)) else { return missing() }
+            var habit = data.habits[i]
+            habit.remindAt = a.time
+            saveHabit(habit)
+        case .taskRename:
+            guard let taskID else { return missing() }
+            guard !a.step.isEmpty else { return false }
+            renameTask(taskID, a.step)
+        case .taskDelete:
+            guard let taskID else { return missing() }
+            deleteTask(taskID)
+        case .taskPlan:
+            guard let taskID else { return missing() }
+            let plan: TaskPlan = a.day < 0 ? .someday : a.day == 0 ? .today : a.day == 1 ? .tomorrow
+                : .date(cal.date(byAdding: .day, value: a.day, to: start) ?? start)
+            setPlan(taskID, plan)
+        case .taskTime:
+            guard let taskID, let time = a.time else { return taskID == nil ? missing() : false }
+            setTaskTime(taskID, DotChat.date(day: max(0, a.day), time: time, from: Date()))
+        case .shopRemove:
+            let items = data.shopItems.filter { $0.boughtAt == nil }
+            guard let i = DotChat.match(a.title, in: items.map(\.name)) else { return missing() }
+            removeShop(items[i].id)
+        case .timerPresets:
+            let numbers: [Int] = a.items.compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }.filter { (1...180).contains($0) }
+            guard !numbers.isEmpty else { return false }
+            s.timerPresets = Array(Set(numbers).sorted().prefix(4))
+            updateReminders(s)
+        case .snooze:
+            guard a.minutes > 0 else { return false }
+            s.snoozeMinutes = min(120, a.minutes)
+            updateReminders(s)
+        case .theme:
+            let want = a.step.lowercased()
+            guard let theme = Theme.all.first(where: { $0.name.lowercased() == want || $0.id == want }) else { return missing() }
+            guard theme.level <= level else {
+                Toaster.shared.show("\(theme.name) gibt's ab Level \(theme.level)")
+                return false
+            }
+            setTheme(theme.id)
+        case .dotName:
+            guard !a.step.isEmpty else { return false }
+            renameDot(a.step)
+        }
+        return true
+    }
+
     /// Dot stellt die App ein: Morgen/Abend pausieren (bis Tag X) oder wieder an, sonst Schalter an/aus.
     private func applySetting(_ a: DotAction) {
         guard let setting = DotSetting(rawValue: a.title) else { return }
@@ -1595,7 +1721,7 @@ final class Store: ObservableObject {
     }
 
     private static func dotAction(_ a: Server.ChatAction) -> DotAction? {
-        guard let kind = DotAction.Kind(rawValue: a.kind), !a.title.isEmpty else { return nil }
+        guard let kind = DotAction.Kind(rawValue: a.kind), !a.title.isEmpty || kind == .edit else { return nil }
         let time: Int? = a.time.flatMap { DotChat.parseTime($0) }
         if kind == .reminder && time == nil { return nil }
         let items: [String] = (a.items ?? []).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -1606,9 +1732,10 @@ final class Store: ObservableObject {
         }
         if kind == .schedule && entries.isEmpty { return nil }
         if kind == .setting && DotSetting(rawValue: a.title) == nil { return nil }
+        if kind == .edit && DotEdit(rawValue: a.key ?? "") == nil { return nil }
         return DotAction(kind: kind, title: a.title, step: a.step ?? "", minutes: a.minutes ?? 10,
                          time: time, day: max(0, a.day ?? 0), items: items, entries: entries,
-                         place: (a.place ?? "").trimmingCharacters(in: .whitespaces))
+                         place: (a.place ?? "").trimmingCharacters(in: .whitespaces), key: a.key ?? "")
     }
 
     /// Vorschlag aus dem Gespräch anlegen – erst beim Antippen, nie von allein.
@@ -1629,6 +1756,10 @@ final class Store: ObservableObject {
                 return
             }
             target = open[i]
+        }
+        // „edit“ erst ausführen – klappt es nicht (Ding nicht gefunden), bleibt der Knopf offen
+        if a.kind == .edit {
+            guard applyEdit(a) else { return }
         }
         data.dotChat[mi].actions[ai].done = true
         let cal = Calendar.current
@@ -1655,6 +1786,8 @@ final class Store: ObservableObject {
             if task.remindAt != nil || task.spotID != nil { rescheduleReminders() }
         case .setting:
             applySetting(a)
+        case .edit:
+            break                   // schon vor dem Abhaken angewendet (applyEdit)
         case .schedule:
             // alle Termine als einmalige Erinnerungen – stehen dann im Plan und kommen als Mitteilung
             var r = data.reminders
@@ -1758,6 +1891,23 @@ final class Store: ObservableObject {
             "halfway (Timer-Halbzeit): \(r.halfwayOn ? "an" : "aus")",
         ]
         lines.append("Einstellungen: " + state.joined(separator: "; "))
+
+        // Was Dot anpassen kann (kind edit) – mit aktuellen Werten
+        let m = data.morning
+        let e = data.evening
+        lines.append("Morgen-Check: \(DotEdit.weekdayText(m.days)), los um \(ClockTime.string(m.leaveAt)), Schritte: "
+                     + m.steps.map { "\($0.title) (\($0.minutes) Min)" }.joined(separator: ", "))
+        lines.append("Abendroutine: \(DotEdit.weekdayText(e.days)), Bett um \(ClockTime.string(e.bedAt)), Schritte: "
+                     + e.steps.map { "\($0.title) (\($0.minutes) Min)" }.joined(separator: ", "))
+        lines.append("Essens-Erinnerung um " + r.mealTimes.map { ClockTime.string($0) }.joined(separator: ", ")
+                     + "; Stupser \(ClockTime.string(r.nudgeFrom))–\(ClockTime.string(r.nudgeTo)) alle \(r.nudgeEvery) Min"
+                     + "; Timer-Knöpfe \(r.timerPresets.map { String($0) }.joined(separator: ", ")) Min; „Später“ \(r.snoozeMinutes) Min")
+        let habitList: [String] = data.habits.map { h in h.title + (h.remindAt.map { " (\(ClockTime.string($0)))" } ?? "") }
+        if !habitList.isEmpty { lines.append("Gewohnheiten: " + habitList.joined(separator: ", ")) }
+        let customs: [String] = r.custom.prefix(15).map { "\($0.title) um \(ClockTime.string($0.minutes))" }
+        if !customs.isEmpty { lines.append("Eigene Erinnerungen: " + customs.joined(separator: ", ")) }
+        let colors: [String] = Theme.all.filter { $0.level <= level }.map(\.name)
+        lines.append("Farbe gerade: \(theme.name) (frei: \(colors.joined(separator: ", "))); Dots Name: \(dotName)")
         lines.append(data.spots.isEmpty ? "Noch keine Orte angelegt (Profil → Orte)."
                      : "Deine Orte: " + data.spots.map(\.name).joined(separator: ", "))
 
