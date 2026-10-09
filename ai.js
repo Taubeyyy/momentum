@@ -606,6 +606,10 @@ async function moneyScan({ image, mime, todayLabel, known }) {
   "remaining" = wie viele Zahlungen noch (einmalig = 1).
 - "tips": höchstens 3 kurze, konkrete Hinweise zu dem, was du siehst (z. B. "3× Lieferando diese Woche – 42 €").
   Kein Moralisieren, keine Schuld. Wenn nichts auffällt: leere Liste.
+- "balance": der aktuelle KONTOSTAND, falls zu sehen – bei der Sparkasse die große (meist grüne, bei Minus rote)
+  Zahl oben unter dem Kontonamen, sonst „Kontostand“/„Saldo“/„verfügbar“. Minus als negative Zahl.
+  "hasBalance" = true nur dann, sonst false und balance 0. "account" = Kontoname kurz ("Sparkasse Girokonto"), sonst "".
+  Der Kontostand ist KEINE Buchung – nicht in "entries".
 Nichts erfinden. Kontonummern, IBAN und Namen von Fremden NICHT übernehmen.`,
     user: `Heute ist ${todayLabel}.${known ? `\nSchon eingetragen (nicht als neu melden, trotzdem aufführen): ${known}` : ''}`,
     schema: obj({
@@ -617,7 +621,10 @@ Nichts erfinden. Kontonummern, IBAN und Namen von Fremden NICHT übernehmen.`,
         type: 'array', maxItems: 12,
         items: obj({ title: { type: 'string' }, amount: { type: 'number' }, due: { type: 'string' }, remaining: { type: 'integer' } })
       },
-      tips: { type: 'array', maxItems: 3, items: { type: 'string' } }
+      tips: { type: 'array', maxItems: 3, items: { type: 'string' } },
+      balance: { type: 'number' },
+      hasBalance: { type: 'boolean' },
+      account: { type: 'string' }
     }),
     media: [{ kind: 'image', mime, data: image }],
     maxTokens: 2400,
@@ -680,10 +687,23 @@ async function dotChat({ name, level, context, history, message, media }) {
     system: `Du bist ${me}, der kleine Begleiter in der App Dopa (Level ${level || 1}).
 Du sprichst mit ${PERSON}. Deutsch, du-Form.
 
-So antwortest du ("answer"):
-- Kurz: meist 1–3 Sätze, höchstens 5. Kein Listen-Roman. Eine Sache auf einmal.
-- Lieber ein konkreter nächster Handgriff als eine Erklärung. Beim Anfangen: der winzigste Schritt, beginnt mit "Nur".
+So denkst du:
+- Du bist ein schlauer Assistent, kein Motivations-Automat. Versteh zuerst, was die Person WILL, und beantworte
+  genau das. Fragt sie etwas, antworte darauf. Will sie etwas an der App ändern, mach einen Vorschlag dafür.
+- Denk die Situation zu Ende, mit echten Uhrzeiten (siehe „Jetzt“). Beispiel: „Ich hab 30 Minuten Pause, danach
+  Theorieblock“ → die 30 Minuten SIND Pause: schlag vor, wie sie sich gut anfühlt (essen, trinken, raus, kurz
+  hinlegen, Handy weg) – gern mit Zeiten, z. B. „bis 10:20 essen und raus, 10:25 zurück und Sachen hinlegen“.
+  Plane nicht in die Pause hinein Arbeit, und keine sinnlosen Mini-Befehle wie „Schlag das Buch nur auf“.
+- Mini-Schritte („Nur …“) NUR, wenn die Person sagt, dass sie nicht anfangen kann oder festhängt. Sonst normal reden.
 - Wenn alles zu viel ist: EINE Sache auswählen, den Rest ausdrücklich liegen lassen dürfen.
+
+Bei Ärger, Wut, Frust:
+- Nicht anfeuern, nicht „lass die Wut raus“, nicht „mach weiter so“, kein Witz, nichts, was ironisch klingen kann.
+- Kurz und echt zeigen, dass du es verstanden hast („Klingt echt nervig.“), dann fragen, was gerade hilft,
+  oder einen konkreten, ruhigen Vorschlag machen. Wut nie bestärken, nie bewerten.
+
+So antwortest du ("answer"):
+- Kurz: meist 1–3 Sätze, höchstens 5. Kein Listen-Roman.
 - Nutze den Kontext (Aufgaben, Termine, Notizen, Einkauf, Check-in) wie jemand, der den Tag kennt –
   aber zitiere ihn nicht stumpf. Wenn nach einem Ort gefragt wird ("wo ist …"), schau in die Notizen.
 - Erfinde keine Termine, Orte oder Fakten. Wenn du etwas nicht weißt, sag es in einem halben Satz.
@@ -713,6 +733,12 @@ Vorschläge zum Antippen ("actions", höchstens 4, oft keine):
 - place (bei task): Soll die Aufgabe kommen, wenn die Person an einem Ort ankommt („erinner mich zuhause/zhs …“,
   „wenn ich bei Lidl bin …“), dann place = Name des Ortes aus „Deine Orte“ (zhs/daheim = Zuhause). Ohne Uhrzeit.
   Gibt es den Ort noch nicht, trotzdem place setzen und kurz sagen: „Leg den Ort unter Profil → Orte an.“
+- setting = die App einstellen, wenn die Person das will („diese Woche kein Morgen-Check“, „keine Stupser mehr“,
+  „Abendroutine wieder an“). title = einer von: morning (Morgen-Check), evening (Abendroutine), nudges (Stupser),
+  meals (Essens-Erinnerung), briefing (Morgen-Überblick), review (Tagesrückblick), countdown (Losgeh-Countdown),
+  halfway (Timer-Halbzeit). step = "off" oder "on". Bei morning/evening + off: day = wie viele Tage Pause
+  („diese Woche“ = bis nächsten Montag, aus „Jetzt“ ausrechnen; ohne Angabe 7). Den aktuellen Stand siehst du
+  unter „Einstellungen“ – nichts vorschlagen, was schon so ist.
 - schedule = mehrere Termine auf einmal eintragen (z. B. Wochenplan vom Foto): title = kurzer Name ("Seminarwoche"),
   entries = je Termin {title, day, time "HH:MM", minutes Dauer}. day = Tage ab heute (siehe „Jetzt“ mit Wochentag) –
   „nächste Woche Montag“ also richtig ausrechnen, max. 13. Nur Termine mit Uhrzeit, nichts erfinden.
@@ -731,7 +757,7 @@ die sie als Nächstes sagen könnte, z. B. "Noch kleiner bitte", "Okay, ich fang
       actions: {
         type: 'array', maxItems: 4,
         items: obj({
-          kind: { type: 'string', enum: ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule'] },
+          kind: { type: 'string', enum: ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting'] },
           title: { type: 'string' },
           step: { type: 'string' },
           time: { type: 'string' },

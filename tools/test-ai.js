@@ -74,7 +74,8 @@ ai.moneyScan = async () => ({
     entries: [{ title: 'Lidl', amount: -23.456, income: false, date: '2026-10-01' }, { title: 'Oma', amount: 20, income: true, date: 'gestern' },
       { title: '', amount: 5, income: false, date: '2026-10-01' }, { title: 'Riesig', amount: 999999, income: false, date: '2026-10-01' }],
     debts: [{ title: 'Klarna – Zalando', amount: 29.99, due: '2026-10-20', remaining: 99 }],
-    tips: ['3× Lieferando diese Woche', '', 'b', 'c', 'd']
+    tips: ['3× Lieferando diese Woche', '', 'b', 'c', 'd'],
+    balance: -12.345, hasBalance: true, account: 'Sparkasse Girokonto'
   },
   provider: 'test'
 });
@@ -96,7 +97,11 @@ ai.dotChat = async ({ name, context, history, message, media }) => ({
   data: {
     answer: media ? `Foto gesehen (${media[0].mime})`
       : `${name}: ${history.length} vorher, ${context.includes('Steuer') ? 'Steuer gesehen' : '?'}, ${message}`,
-    actions: [
+    actions: message.includes('Morgen-Check') ? [
+      { kind: 'setting', title: 'morning', step: 'off', time: '', day: 3, minutes: 0 },
+      { kind: 'setting', title: 'quatsch', step: 'off', time: '', day: 0, minutes: 0 },
+      { kind: 'setting', title: 'nudges', step: 'vielleicht', time: '', day: 0, minutes: 0 }
+    ] : [
       { kind: 'reminder', title: 'Oma anrufen', step: '', time: '9:30', day: 1, minutes: 0, place: '  Zuhause ' },
       { kind: 'reminder', title: 'ohne Zeit', step: '', time: 'später', day: 0, minutes: 0 },
       { kind: 'quatsch', title: 'x', step: '', time: '', day: 0, minutes: 0 },
@@ -374,6 +379,7 @@ function check(name, cond, extra) {
   check('money/scan: Beträge positiv/gerundet, Unsinn raus, Raten begrenzt, max 3 Tipps',
     scan.body.entries?.length === 2 && scan.body.entries[0].amount === 23.46 && scan.body.entries[1].income === true
     && /^\d{4}-\d{2}-\d{2}$/.test(scan.body.entries[1].date) && scan.body.debts?.[0]?.remaining === 36 && scan.body.tips?.length === 3, scan.body);
+  check('money/scan: Kontostand (auch im Minus) und Kontoname', scan.body.balance === -12.35 && scan.body.account === 'Sparkasse Girokonto', scan.body);
   const tips = await app('POST', '/api/dopa/money/tips', { summary: 'Lieferando 4× 48 €' });
   check('money/tips kommt durch', tips.body.tips?.[0] === 'Lieferando 4×', tips.body);
   const voice = await app('POST', '/api/dopa/voice', { audio: 'UklGR' + 'A'.repeat(2000), format: 'wav', hints: ['Tabletten', 'Bewerbung'] });
@@ -413,6 +419,10 @@ function check(name, cond, extra) {
   check('Dot-Chat: Schritte an Aufgabe, Leeres fliegt raus',
     JSON.stringify(chat.body.actions?.[2]?.items) === JSON.stringify(['Medikamente', 'Kleidung Mo–Fr']), chat.body.actions);
   check('Dot-Chat: Ort kommt sauber durch', chat.body.actions?.[0]?.place === 'Zuhause', chat.body.actions);
+  const settingChat = await app('POST', '/api/dopa/chat', { message: 'diese Woche kein Morgen-Check', history: [] });
+  const settings = (settingChat.body.actions || []).filter(a => a.kind === 'setting');
+  check('Dot-Chat: Einstellung durch, unbekannte fliegt raus',
+    settings.length === 1 && settings[0].title === 'morning' && settings[0].day === 3, settingChat.body.actions);
   check('Dot-Chat: Werte begrenzt', chat.body.actions?.[1]?.day === 13 && chat.body.actions[1].minutes === 90, chat.body.actions);
   check('Dot-Chat: höchstens 3 Antworten zum Antippen', chat.body.suggestions?.length === 3 && !chat.body.suggestions.includes(''), chat.body.suggestions);
   const photoChat = await app('POST', '/api/dopa/chat', {

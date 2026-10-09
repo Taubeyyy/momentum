@@ -10,6 +10,7 @@ struct DotAction: Codable, Identifiable, Hashable {
         case done, tomorrow             // bestehende Aufgabe abhaken / auf morgen schieben
         case steps                      // Schritte an eine bestehende Aufgabe hängen
         case schedule                   // mehrere Termine auf einmal (z. B. Wochenplan vom Foto)
+        case setting                    // App einstellen: title = DotSetting, step = "on"/"off", day = Pause in Tagen
     }
 
     var id = UUID()
@@ -54,6 +55,8 @@ struct DotAction: Codable, Identifiable, Hashable {
             return "\(stepCount) zu „\(title)“"
         case .schedule:
             return "\(title) eintragen · \(entryCount)"
+        case .setting:
+            return DotSetting(rawValue: title)?.label(on: step == "on", days: day) ?? "Einstellung ändern"
         case .reminder:
             let clock: String = time.map { " " + DotChat.clock($0) } ?? ""
             return "Erinnerung\(when)\(clock) · \(title)"
@@ -81,6 +84,7 @@ struct DotAction: Codable, Identifiable, Hashable {
         case .tomorrow: "arrow.turn.up.right"
         case .steps: "list.bullet.indent"
         case .schedule: "calendar.badge.plus"
+        case .setting: "slider.horizontal.3"
         }
     }
 
@@ -96,7 +100,41 @@ struct DotAction: Codable, Identifiable, Hashable {
         case .tomorrow: "Liegt jetzt bei morgen"
         case .steps: "Schritte stehen bei „\(title)“"
         case .schedule: "\(entryCount) stehen im Plan"
+        case .setting: "Eingestellt: " + label
         }
+    }
+}
+
+/// Was Dot in der App ein- und ausschalten darf („diese Woche kein Morgen-Check“, „keine Stupser mehr“).
+enum DotSetting: String, CaseIterable {
+    case morning, evening, nudges, meals, briefing, review, countdown, halfway
+
+    var name: String {
+        switch self {
+        case .morning: "Morgen-Check"
+        case .evening: "Abendroutine"
+        case .nudges: "Stupser"
+        case .meals: "Essens-Erinnerung"
+        case .briefing: "Morgen-Überblick"
+        case .review: "Tagesrückblick"
+        case .countdown: "Losgeh-Countdown"
+        case .halfway: "Timer-Halbzeit"
+        }
+    }
+
+    /// Morgen und Abend lassen sich bis zu einem Tag pausieren, der Rest nur an/aus.
+    var pausable: Bool { self == .morning || self == .evening }
+
+    /// Ohne Angabe pausiert Dot eine Woche – nie für immer aus Versehen.
+    static let defaultPauseDays = 7
+
+    func label(on: Bool, days: Int, from now: Date = Date()) -> String {
+        if on { return "\(name) wieder an" }
+        if pausable {
+            let until = days > 0 ? days : DotSetting.defaultPauseDays
+            return "\(name) pausieren bis \(DotChat.dayLabel(until, from: now))"
+        }
+        return "\(name) aus"
     }
 }
 

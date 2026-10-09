@@ -79,6 +79,7 @@ struct Morning: Codable, Hashable {
     var checked: [UUID] = []
     var todayLeave: Int?        // nur heute: andere Los-Zeit; -1 = heute ohne Uhr
     var days = [2, 3, 4, 5, 6]  // Erinnerung + Zeitleiste (1 = So … 7 = Sa)
+    var pausedUntil: Date?      // „diese Woche kein Morgen-Check“ – bis zu diesem Tag (ausschließlich) aus
 
     /// Los-Zeit für heute (eigene Zeit oder Plan).
     var leaveToday: Int { todayLeave.flatMap { $0 >= 0 ? $0 : nil } ?? leaveAt }
@@ -106,12 +107,18 @@ struct Morning: Codable, Hashable {
         m.startedAt = nil
         m.checked = []
         // an Tagen ohne feste Zeit (z. B. Wochenende): einfach starten, wann du willst
-        m.todayLeave = days.contains(Calendar.current.component(.weekday, from: now)) ? nil : -1
+        m.todayLeave = isScheduled(on: now) ? nil : -1
         return m
     }
 
     func isScheduled(on date: Date) -> Bool {
-        days.contains(Calendar.current.component(.weekday, from: date))
+        if isPaused(on: date) { return false }
+        return days.contains(Calendar.current.component(.weekday, from: date))
+    }
+
+    func isPaused(on date: Date) -> Bool {
+        guard let pausedUntil else { return false }
+        return Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: pausedUntil)
     }
 
     /// Abfahrt heute; liegt sie schon hinter dem Start (z. B. abends ausprobiert), ab Start gerechnet.
@@ -134,6 +141,7 @@ struct Evening: Codable, Hashable {
     var checked: [UUID] = []
     var tonightBed: Int?                // nur heute Abend: andere Schlafenszeit; -1 = ohne Uhr
     var days = [1, 2, 3, 4, 5, 6, 7]    // Abende mit fester Zeit; sonst jederzeit ohne Uhr
+    var pausedUntil: Date?              // Abendroutine bis zu diesem Tag (ausschließlich) aus
 
     static let dayStartHour = 5
 
@@ -177,7 +185,13 @@ struct Evening: Codable, Hashable {
     /// Hat der laufende Abend (bis 5 Uhr früh) eine feste Zeit?
     func isScheduled(_ now: Date = Date()) -> Bool {
         let evening = now.addingTimeInterval(-Double(Self.dayStartHour) * 3600)
+        if isPaused(on: evening) { return false }
         return days.contains(Calendar.current.component(.weekday, from: evening))
+    }
+
+    func isPaused(on date: Date) -> Bool {
+        guard let pausedUntil else { return false }
+        return Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: pausedUntil)
     }
 
     /// Schlafenszeit des laufenden Abends (0:30 liegt schon im nächsten Kalendertag).
@@ -448,6 +462,27 @@ struct AppData: Codable {
     var dotChat: [DotMessage] = []                  // Gespräch mit Dot (gekürzt auf DotChat.keep)
     var workshop = WorkshopState()                  // Dots Werkstatt (Idle-Spiel)
     var spots: [Spot] = []                          // Orte für Erinnerungen beim Ankommen
+    var bank: BankBalance?                          // Kontostand vom letzten Banking-Screenshot
+}
+
+/// Kontostand, wie er auf dem letzten Screenshot stand (z. B. Sparkasse: die große Zahl oben).
+struct BankBalance: Codable, Hashable {
+    var amount: Double                  // darf negativ sein
+    var account = ""                    // „Sparkasse Girokonto“
+    var at = Date()                     // wann eingelesen
+
+    init(amount: Double, account: String = "", at: Date = Date()) {
+        self.amount = amount
+        self.account = account
+        self.at = at
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        amount = (try? c.decodeIfPresent(Double.self, forKey: .amount)) ?? 0
+        account = (try? c.decodeIfPresent(String.self, forKey: .account)) ?? ""
+        at = (try? c.decodeIfPresent(Date.self, forKey: .at)) ?? Date()
+    }
 }
 
 // Tolerantes Dekodieren: Felder, die in einer älteren Version noch fehlten,
@@ -494,6 +529,7 @@ extension AppData {
         dotChat = c.value(.dotChat, or: [])
         workshop = c.value(.workshop, or: WorkshopState())
         spots = c.value(.spots, or: [])
+        bank = c.value(.bank, or: nil)
     }
 }
 
@@ -507,6 +543,7 @@ extension Evening {
         checked = c.value(.checked, or: [])
         tonightBed = c.value(.tonightBed, or: nil)
         days = c.value(.days, or: [1, 2, 3, 4, 5, 6, 7])
+        pausedUntil = c.value(.pausedUntil, or: nil)
     }
 }
 
@@ -647,6 +684,7 @@ extension Morning {
         checked = c.value(.checked, or: [])
         todayLeave = c.value(.todayLeave, or: nil)
         days = c.value(.days, or: [2, 3, 4, 5, 6])
+        pausedUntil = c.value(.pausedUntil, or: nil)
     }
 }
 

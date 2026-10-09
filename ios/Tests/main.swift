@@ -29,6 +29,29 @@ for (text, kind) in memoCases {
     expect(MemoKind.detect(text), kind, "MemoKind(\(text))")
 }
 
+// Morgen-Check pausieren („diese Woche kein Morgen-Check“)
+var pausedMorning = Morning()
+pausedMorning.pausedUntil = day(2026, 10, 12)              // ab Montag wieder
+expect(pausedMorning.isScheduled(on: day(2026, 10, 9)), false, "Freitag pausiert")
+expect(pausedMorning.isScheduled(on: day(2026, 10, 12)), true, "Montag wieder an")
+expect(pausedMorning.forToday(day(2026, 10, 9)).untimed, true, "pausierter Tag ohne Uhr")
+var pausedEvening = Evening()
+pausedEvening.pausedUntil = day(2026, 10, 11)
+expect(pausedEvening.isScheduled(day(2026, 10, 10, 21)), false, "Abendroutine pausiert")
+
+// Dot stellt die App ein
+expect(DotSetting.morning.label(on: false, days: 3, from: day(2026, 10, 9)), "Morgen-Check pausieren bis Mo 12.10.", "Morgen pausieren")
+expect(DotSetting.morning.label(on: false, days: 0, from: day(2026, 10, 9)), "Morgen-Check pausieren bis Fr 16.10.", "ohne Angabe eine Woche")
+expect(DotSetting.nudges.label(on: false, days: 0), "Stupser aus", "Stupser aus")
+expect(DotSetting.morning.label(on: true, days: 0), "Morgen-Check wieder an", "wieder an")
+expect(DotAction(kind: .setting, title: "nudges", step: "off").label, "Stupser aus", "Einstellungs-Knopf")
+
+// Kontostand vom Screenshot
+let oldData = try! JSONDecoder().decode(AppData.self, from: #"{"tasks":[]}"#.data(using: .utf8)!)
+expect(oldData.bank == nil, true, "ohne Kontostand lesbar")
+let bankJSON = #"{"amount":-12.35,"account":"Sparkasse"}"#.data(using: .utf8)!
+expect(try! JSONDecoder().decode(BankBalance.self, from: bankJSON).amount, -12.35, "Kontostand im Minus")
+
 // Aufträge auf „Merken“ (Lehrkraft, Chef …) – Vorfilter für „Auch als Aufgabe?“
 expect(Smart.looksLikeAssignment("Frau M. sagt, ich soll bis Freitag 20 Kopien machen"), true, "Auftrag erkannt")
 expect(Smart.looksLikeAssignment("Plakat für die 3b vorbereiten"), true, "Vorbereiten ist ein Auftrag")

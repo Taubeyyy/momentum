@@ -199,7 +199,8 @@ enum Reminders {
             }
         }
 
-        if settings.morningOn && !settings.briefingOn {
+        // pausiert („diese Woche kein Morgen-Check“): gar nicht planen – nach der Pause plant das nächste Öffnen neu
+        if settings.morningOn && !settings.briefingOn && !morning.isPaused(on: Date()) {
             let wake = morning.wakeAt
             let body = "\(morning.steps.count) Schritte, \(morning.totalMinutes) Min – los um \(ClockTime.string(morning.leaveAt)). Tippen zum Starten."
             for weekday in morning.days {   // Standard Mo–Fr (Sonntag = 1)
@@ -213,7 +214,7 @@ enum Reminders {
             }
         }
 
-        if settings.eveningOn {
+        if settings.eveningOn && !ctx.evening.isPaused(on: Date()) {
             let e = ctx.evening
             for weekday in e.days {
                 var components = DateComponents()

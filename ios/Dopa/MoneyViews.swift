@@ -49,6 +49,19 @@ struct MoneyContent: View {
         let month = store.moneyMonth
         return Card(title: "Diesen \(monthName)", symbol: "chart.bar.fill") {
             VStack(alignment: .leading, spacing: 0) {
+                // Kontostand vom letzten Banking-Screenshot (Sparkasse: die große Zahl oben)
+                if let bank = store.data.bank {
+                    HStack(spacing: 6) {
+                        Image(systemName: "building.columns.fill").font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DS.purpleMuted)
+                        Text("Konto \(MoneyMath.euro(bank.amount))")
+                            .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(bank.amount < 0 ? Color(hex: 0xF5B94A) : DS.ink)
+                        Text("· Stand \(DayLabel.text(for: bank.at))")
+                            .font(.system(size: 12)).foregroundStyle(DS.muted)
+                    }
+                    .padding(.bottom, 10)
+                }
                 Text(month.income > 0 ? "noch frei" : "ausgegeben")
                     .font(.system(size: 12, weight: .semibold)).foregroundStyle(DS.muted)
                 RollingText(text: MoneyMath.euro(month.income > 0 ? month.left : month.spent))
@@ -443,6 +456,17 @@ struct ScanSheet: View {
 
     @ViewBuilder
     private func results(_ scan: Server.Scan) -> some View {
+        if let balance = scan.balance {
+            Card(title: "Kontostand", symbol: "building.columns.fill") {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(MoneyMath.euro(balance))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(balance < 0 ? Color(hex: 0xF5B94A) : DS.ink)
+                    Text((scan.account ?? "").isEmpty ? "Wird beim Übernehmen gemerkt." : "\(scan.account ?? "") · wird beim Übernehmen gemerkt.")
+                        .font(.system(size: 12)).foregroundStyle(DS.muted)
+                }
+            }
+        }
         if !scan.tips.isEmpty {
             Card(title: "\(store.dotName) sieht", symbol: "lightbulb.fill") {
                 VStack(alignment: .leading, spacing: 8) {
@@ -485,18 +509,20 @@ struct ScanSheet: View {
                 }
             }
         }
-        if scan.entries.isEmpty && scan.debts.isEmpty {
+        if scan.entries.isEmpty && scan.debts.isEmpty && scan.balance == nil {
             Text("Auf dem Screenshot war nichts Lesbares. Am besten die Umsatzliste oder die Klarna-Übersicht.")
                 .font(.system(size: 13)).foregroundStyle(DS.muted)
         } else {
-            Button("\(pickedEntries.count + pickedDebts.count) übernehmen") {
+            let count = pickedEntries.count + pickedDebts.count
+            Button(count == 0 ? "Kontostand übernehmen" : "\(count) übernehmen") {
                 store.importScan(entries: pickedEntries.sorted().map { scan.entries[$0] },
-                                 debts: pickedDebts.sorted().map { scan.debts[$0] })
+                                 debts: pickedDebts.sorted().map { scan.debts[$0] },
+                                 balance: scan.balance, account: scan.account ?? "")
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 dismiss()
             }
             .buttonStyle(SolidButtonStyle())
-            .disabled(pickedEntries.isEmpty && pickedDebts.isEmpty)
+            .disabled(count == 0 && scan.balance == nil)
         }
     }
 

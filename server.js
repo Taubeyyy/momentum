@@ -727,7 +727,9 @@ app.post('/api/dopa/chat', auth, aiLimit, async (req, res) => {
   } catch (e) { aiFail(res, e); }
 });
 
-const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule'];
+const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorrow', 'steps', 'schedule', 'setting'];
+// Was Dot in der App einstellen darf (kind „setting“): title = einer davon, step = on/off
+const DOT_SETTINGS = ['morning', 'evening', 'nudges', 'meals', 'briefing', 'review', 'countdown', 'halfway'];
 
 function cleanDotChat(data) {
   const time = t => /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(t || '').trim()) ? String(t).trim().padStart(5, '0') : '';
@@ -749,7 +751,8 @@ function cleanDotChat(data) {
     entries: entries(a?.entries),
     place: str(a?.place, 60).trim()       // Ort: Aufgabe meldet sich beim Ankommen
   })).filter(a => a.kind && a.title && (a.kind !== 'reminder' || a.time) && (a.kind !== 'steps' || a.items.length)
-    && (a.kind !== 'schedule' || a.entries.length))
+    && (a.kind !== 'schedule' || a.entries.length)
+    && (a.kind !== 'setting' || (DOT_SETTINGS.includes(a.title) && ['on', 'off'].includes(a.step))))
     .slice(0, 4);
   const suggestions = (Array.isArray(data?.suggestions) ? data.suggestions : [])
     .map(s => str(s, 60).trim()).filter(Boolean).slice(0, 3);
@@ -843,6 +846,10 @@ app.post('/api/dopa/money/scan', auth, aiLimit, async (req, res) => {
         remaining: clamp(d.remaining ?? 1, 1, 36)
       })).filter(d => d.title && d.amount),
       tips: (data.tips || []).map(t => str(t, 200).trim()).filter(Boolean).slice(0, 3),
+      // Kontostand (z. B. Sparkasse: die große Zahl oben) – darf auch negativ sein
+      balance: data.hasBalance === true && Number.isFinite(Number(data.balance)) && Math.abs(Number(data.balance)) <= 1000000
+        ? Math.sign(Number(data.balance)) * Math.round(Math.abs(Number(data.balance)) * 100) / 100 : null,
+      account: str(data.account, 60).trim(),
       provider
     });
   } catch (e) { aiFail(res, e); }

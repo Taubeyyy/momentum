@@ -128,7 +128,13 @@ final class Server: ObservableObject {
 
     struct ScanEntry: Decodable, Hashable { let title: String; let amount: Double; let income: Bool; let date: String }
     struct ScanDebt: Decodable, Hashable { let title: String; let amount: Double; let due: String; let remaining: Int }
-    struct Scan: Decodable { let entries: [ScanEntry]; let debts: [ScanDebt]; let tips: [String] }
+    struct Scan: Decodable {
+        let entries: [ScanEntry]
+        let debts: [ScanDebt]
+        let tips: [String]
+        let balance: Double?        // Kontostand, falls auf dem Screenshot (Sparkasse: große Zahl oben)
+        let account: String?
+    }
 
     /// Screenshot aus Bank/Klarna → Buchungen, offene Raten, Tipps.
     func moneyScan(_ image: String, known: String) async throws -> Scan {

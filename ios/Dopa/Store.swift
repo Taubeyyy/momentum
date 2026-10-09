@@ -836,7 +836,10 @@ final class Store: ObservableObject {
     }
 
     /// Ausgewählte Buchungen ins Tagebuch, offene Raten in „Offene Zahlungen“.
-    func importScan(entries: [Server.ScanEntry], debts: [Server.ScanDebt]) {
+    func importScan(entries: [Server.ScanEntry], debts: [Server.ScanDebt], balance: Double? = nil, account: String = "") {
+        if let balance {
+            data.bank = BankBalance(amount: balance, account: account)
+        }
         for e in entries {
             data.spends.append(Spend(title: e.title, amount: e.amount, date: Self.scanDate(e.date) ?? Date(),
                                      kind: SpendKind.detect(e.title), income: e.income))
@@ -848,7 +851,8 @@ final class Store: ObservableObject {
         save()
         rescheduleReminders()
         if !entries.isEmpty { award(.spendLogged) }
-        let parts = [entries.isEmpty ? nil : "\(entries.count) Buchungen", debts.isEmpty ? nil : "\(debts.count) Raten"].compactMap { $0 }
+        let parts = [balance == nil ? nil : "Kontostand",
+                     entries.isEmpty ? nil : "\(entries.count) Buchungen", debts.isEmpty ? nil : "\(debts.count) Raten"].compactMap { $0 }
         Toaster.shared.show(parts.joined(separator: " und ") + " übernommen")
     }
 
@@ -1077,7 +1081,7 @@ final class Store: ObservableObject {
             let key = Quest.dayKey(day)
             let isToday = offset == 0
             if r.briefingOn {
-                let routineDay = data.morning.days.contains(cal.component(.weekday, from: day))
+                let routineDay = data.morning.isScheduled(on: day)     // pausiert = freier Tag
                 let m = isToday ? morning : data.morning
                 let at = routineDay ? (isToday ? m.wakeToday : m.wakeAt) : r.freeDayBriefingAt
                 let fire = ClockTime.date(at, on: day)
@@ -1136,8 +1140,7 @@ final class Store: ObservableObject {
         if let sleepLine { lines.append(sleepLine) }
         let habits = data.habits.map(\.title)
         if !habits.isEmpty { lines.append("Gewohnheiten: " + habits.joined(separator: ", ")) }
-        let weekday = Calendar.current.component(.weekday, from: Date())
-        lines.append(data.morning.days.contains(weekday) ? "Heute ist ein Tag mit Morgen-Checkliste (früh los)." : "Heute ohne festen Morgen.")
+        lines.append(data.morning.isScheduled(on: Date()) ? "Heute ist ein Tag mit Morgen-Checkliste (früh los)." : "Heute ohne festen Morgen.")
         return lines
     }
 
@@ -1459,6 +1462,31 @@ final class Store: ObservableObject {
         save()
     }
 
+    /// Dot stellt die App ein: Morgen/Abend pausieren (bis Tag X) oder wieder an, sonst Schalter an/aus.
+    private func applySetting(_ a: DotAction) {
+        guard let setting = DotSetting(rawValue: a.title) else { return }
+        let on = a.step == "on"
+        let cal = Calendar.current
+        let days = a.day > 0 ? a.day : DotSetting.defaultPauseDays
+        let until = cal.date(byAdding: .day, value: days, to: cal.startOfDay(for: Date()))
+        var s = data.reminders
+        switch setting {
+        case .morning:
+            data.morning.pausedUntil = on ? nil : until
+            if on { s.morningOn = true }
+        case .evening:
+            data.evening.pausedUntil = on ? nil : until
+            if on { s.eveningOn = true }
+        case .nudges: s.nudgeOn = on
+        case .meals: s.mealsOn = on
+        case .briefing: s.briefingOn = on
+        case .review: s.reviewOn = on
+        case .countdown: s.countdownOn = on
+        case .halfway: s.halfwayOn = on
+        }
+        updateReminders(s)          // speichert und plant alle Mitteilungen neu
+    }
+
     // MARK: Orte
 
     func saveSpot(_ spot: Spot) {
@@ -1577,6 +1605,7 @@ final class Store: ObservableObject {
             return PlanEntry(title: e.title, day: max(0, min(13, e.day ?? 0)), time: at, minutes: max(5, e.minutes ?? 60))
         }
         if kind == .schedule && entries.isEmpty { return nil }
+        if kind == .setting && DotSetting(rawValue: a.title) == nil { return nil }
         return DotAction(kind: kind, title: a.title, step: a.step ?? "", minutes: a.minutes ?? 10,
                          time: time, day: max(0, a.day ?? 0), items: items, entries: entries,
                          place: (a.place ?? "").trimmingCharacters(in: .whitespaces))
@@ -1624,6 +1653,8 @@ final class Store: ObservableObject {
             data.tasks.insert(task, at: 0)
             save()
             if task.remindAt != nil || task.spotID != nil { rescheduleReminders() }
+        case .setting:
+            applySetting(a)
         case .schedule:
             // alle Termine als einmalige Erinnerungen – stehen dann im Plan und kommen als Mitteilung
             var r = data.reminders
@@ -1709,6 +1740,24 @@ final class Store: ObservableObject {
             }
         }
         lines.append("Bettzeit heute: \(ClockTime.string(evening.bedTonight))")
+
+        // Einstellungen, die Dot ändern kann (kind setting)
+        let r = data.reminders
+        let pauseText: (Date?) -> String = { until in
+            guard let until, until > now else { return "an" }
+            return "pausiert bis \(date.string(from: until))"
+        }
+        let state: [String] = [
+            "morning (Morgen-Check): \(pauseText(data.morning.pausedUntil))",
+            "evening (Abendroutine): \(pauseText(data.evening.pausedUntil))",
+            "nudges (Stupser): \(r.nudgeOn ? "an" : "aus")",
+            "meals (Essen): \(r.mealsOn ? "an" : "aus")",
+            "briefing (Morgen-Überblick): \(r.briefingOn ? "an" : "aus")",
+            "review (Tagesrückblick): \(r.reviewOn ? "an" : "aus")",
+            "countdown (Losgeh-Countdown): \(r.countdownOn ? "an" : "aus")",
+            "halfway (Timer-Halbzeit): \(r.halfwayOn ? "an" : "aus")",
+        ]
+        lines.append("Einstellungen: " + state.joined(separator: "; "))
         lines.append(data.spots.isEmpty ? "Noch keine Orte angelegt (Profil → Orte)."
                      : "Deine Orte: " + data.spots.map(\.name).joined(separator: ", "))
 
