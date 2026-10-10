@@ -203,7 +203,10 @@ final class Store: ObservableObject {
     func setDone(_ id: UUID, _ done: Bool) {
         let wasDone = data.tasks.first { $0.id == id }?.doneAt != nil
         updateTask(id) { $0.doneAt = done ? Date() : nil }
-        if done && !wasDone { award(.taskDone) }
+        if done && !wasDone {
+            award(.taskDone)
+            maybeSurprise()
+        }
         if !done && wasDone { revoke(.taskDone) }
         if let t = data.tasks.first(where: { $0.id == id }), t.remindAt != nil || t.spotID != nil {
             rescheduleReminders()           // Erinnerung (Uhrzeit oder Ort) weg bzw. wieder da
@@ -359,6 +362,40 @@ final class Store: ObservableObject {
     /// Im Hintergrund (App-Aktualisierung): Texte neu auslosen, ohne dass du die App öffnest.
     func rescheduleRemindersNow() async {
         await Reminders.reschedule(reminderContext())
+    }
+
+    // MARK: Überraschungen
+
+    struct SurpriseEvent: Identifiable, Equatable {
+        let id = UUID()
+        let kind: SurpriseKind
+        let text: String
+    }
+
+    /// Gerade sichtbare Überraschung (RootView zeigt sie, tippen oder warten schließt sie).
+    @Published var surprise: SurpriseEvent?
+
+    /// Nach dem Abhaken: selten (höchstens 2× am Tag, mit Abstand) etwas Unerwartetes.
+    private func maybeSurprise() {
+        guard !CommandLine.arguments.contains("-uitest") else { return }   // Rundgang im CI nicht stören
+        let defaults = UserDefaults.standard
+        let today = Quest.dayKey()
+        let shown = defaults.string(forKey: "surpriseDay") == today ? defaults.integer(forKey: "surpriseCount") : 0
+        let last = defaults.object(forKey: "surpriseLast") as? Date
+        guard Surprise.shouldShow(shownToday: shown, last: last, now: Date(), roll: Double.random(in: 0..<1)) else { return }
+        let kind = Surprise.kind(roll: Double.random(in: 0..<1))
+        // jede Art zählt reihum weiter – erst alle Witze, dann wieder der erste
+        let counterKey = "surpriseN-\(kind.rawValue)"
+        let n = defaults.integer(forKey: counterKey)
+        defaults.set(n + 1, forKey: counterKey)
+        defaults.set(today, forKey: "surpriseDay")
+        defaults.set(shown + 1, forKey: "surpriseCount")
+        defaults.set(Date(), forKey: "surpriseLast")
+        // kurz warten, damit erst das Abhaken selbst zu sehen ist
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            surprise = SurpriseEvent(kind: kind, text: Surprise.text(kind, n: n))
+        }
     }
 
     // MARK: Pause ohne Vorwurf (Feedback #50)

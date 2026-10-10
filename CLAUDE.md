@@ -84,6 +84,20 @@ Auf dem Server gibt es kein Xcode und kein `gh` – Swift wird nur im CI gebaut.
   (chronod/ActivityKit) beim Test – nur das sagt, warum iOS beendet.
   Fertige IPA durchleuchten: `python3 tools/ipa-check.py <ipa>` (Info.plists, Plattform, Entitlements, Signatur-ID).
 
+## Fahrplan „App wird langweilig“ (Wunsch vom 10.10.)
+
+Edwin will **alle** Ideen, aber pro Session wenige, jedes Feature komplett durchdacht und fertig – nicht alles zu 10 %.
+Logik in `Shared/Fun.swift` (testbar), jedes Feature auch im Simulator-Rundgang antippen.
+
+1. ✅ Build 114: Dot zieht für dich (`DrawView.swift`), Verkleidungen (`DotOutfitView.swift`, Anprobe unter Profil → Farben),
+   Überraschungen nach dem Abhaken (`SurpriseView.swift`, max. 2/Tag, 30 Min Abstand).
+2. Widget, das sich täglich ändert: Dot mit Tages-Outfit + genau eine kleine Sache (Widget teilt `Outfit.today` über Shared).
+3. Dot arbeitet neben dir: während des Timers sitzt Dot mit Laptop daneben, optional Regen/Café-Geräusch (lokal, kein Stream).
+4. Dot hat Tageslaunen (müde/albern/philosophisch) – Gesicht + Sprüche passend, Server-Tagesskript bekommt die Laune.
+5. Sammelalbum ohne Druck: ab und zu ein Sticker fürs Erledigen, nichts kann verloren gehen oder reißen.
+6. Wochen-Story am Sonntagabend (zum Durchtippen, ohne Bewertung).
+7. Mit Dot sprechen statt tippen (Knopf halten; `/api/dopa/voice` gibt es schon).
+
 ## ADHS-Regeln
 
 - Anfangen ist die Hürde → wenige Tipps pro Aktion, ein klarer nächster Schritt, Minuten statt Pflichten.

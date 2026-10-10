@@ -1,7 +1,7 @@
 import Foundation
 
 // Logik-Tests für die Regeln ohne KI. Laufen im CI vor dem Build:
-//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Shared/NoteVariety.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
+//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Shared/NoteVariety.swift Shared/Fun.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
 
 var failures = 0
 
@@ -462,6 +462,51 @@ expect(NoteVariety.comebackDates(lastActive: day(2026, 10, 10, 9), now: day(2026
 expect(NoteVariety.isComeback(lastActive: day(2026, 10, 8, 23), now: day(2026, 10, 10, 8)), true, "zwei Tage weg")
 expect(NoteVariety.isComeback(lastActive: day(2026, 10, 9, 23), now: day(2026, 10, 10, 8)), false, "gestern da")
 expect(NoteVariety.isComeback(lastActive: nil, now: day(2026, 10, 10, 8)), false, "erstes Öffnen")
+
+// Dot zieht für dich
+let drawNow = day(2026, 10, 10, 15)
+let fresh = TaskItem(title: "Neu", createdAt: drawNow)
+let oldOne = TaskItem(title: "Alt", createdAt: day(2026, 9, 20))
+let planned = TaskItem(title: "Heute", createdAt: drawNow, dueDay: day(2026, 10, 10, 0))
+expect(Draw.weight(fresh, now: drawNow), 1.0, "neue Aufgabe Grundgewicht")
+expect(Draw.weight(oldOne, now: drawNow), 4.0, "lange liegend wiegt mehr (max +3)")
+expect(Draw.weight(planned, now: drawNow), 3.0, "heute geplant wiegt mehr")
+let drawPool = [fresh, oldOne, planned]          // Gewichte 1, 4, 3 → Summe 8
+expect(Draw.pick(drawPool, excluding: [], now: drawNow, roll: 0.05)?.title, "Neu", "Zufall vorne")
+expect(Draw.pick(drawPool, excluding: [], now: drawNow, roll: 0.5)?.title, "Alt", "Zufall Mitte")
+expect(Draw.pick(drawPool, excluding: [], now: drawNow, roll: 0.99)?.title, "Heute", "Zufall hinten")
+expect(Draw.pick(drawPool, excluding: [oldOne.id], now: drawNow, roll: 0.5)?.title, "Heute", "Gezogene kommen nicht nochmal")
+expect(Draw.pick([], excluding: [], now: drawNow, roll: 0.5) == nil, true, "nichts zu ziehen")
+var doneTask = fresh
+doneTask.doneAt = drawNow
+expect(Draw.pick([doneTask], excluding: [], now: drawNow, roll: 0.5) == nil, true, "Erledigte nicht")
+expect(Draw.gentle.contains(Draw.twist(energy: "low", hour: 15, roll: 0.9)), true, "wenig Energie: kurz")
+expect(Draw.gentle.contains(Draw.twist(energy: "high", hour: 23, roll: 0.3)), true, "spät: kurz")
+expect(Draw.twists.contains(Draw.twist(energy: nil, hour: 15, roll: 0.999)), true, "tagsüber: alle")
+expect(Draw.isJoker(draw: 1, roll: 0), false, "erste Karte nie Joker")
+expect(Draw.isJoker(draw: 2, roll: 0.1), true, "später manchmal Joker")
+
+// Dots Verkleidungen
+expect(Outfit.today(day(2026, 10, 31)), .witchHat, "Halloween")
+expect(Outfit.today(day(2026, 12, 24)), .santaHat, "Weihnachten")
+expect(Outfit.today(day(2026, 12, 31)), .partyHat, "Silvester")
+expect(Outfit.today(day(2027, 1, 1)), .partyHat, "Neujahr")
+expect(Outfit.today(day(2026, 10, 12, 8)), Outfit.today(day(2026, 10, 12, 22)), "ganzer Tag gleiches Outfit")
+expect(Outfit.dayRoll(day(2026, 3, 3), salt: 1) < 100, true, "Tageswert im Bereich")
+let winter: [DotOutfit] = (1...28).map { Outfit.today(day(2027, 2, $0)) }
+expect(winter.contains(.beanie), true, "im Winter manchmal Mütze")
+expect(winter.contains(.sunglasses), false, "keine Sonnenbrille im Februar")
+expect(DotOutfit.sunglasses.onHead, false, "Brille sitzt nicht auf dem Kopf")
+
+// Überraschungen
+expect(Surprise.shouldShow(shownToday: 0, last: nil, now: drawNow, roll: 0.1), true, "selten ja")
+expect(Surprise.shouldShow(shownToday: 0, last: nil, now: drawNow, roll: 0.5), false, "meistens nicht")
+expect(Surprise.shouldShow(shownToday: 2, last: nil, now: drawNow, roll: 0), false, "höchstens zwei am Tag")
+expect(Surprise.shouldShow(shownToday: 1, last: drawNow.addingTimeInterval(-600), now: drawNow, roll: 0), false, "nicht kurz hintereinander")
+expect(Surprise.kind(roll: 0), .confetti, "Art vorne")
+expect(Surprise.kind(roll: 0.99), .spin, "Art hinten")
+expect(Surprise.text(.joke, n: 0) != Surprise.text(.joke, n: 1), true, "Witze reihum")
+expect(Surprise.text(.fact, n: Surprise.facts.count), Surprise.text(.fact, n: 0), "nach allen von vorn")
 
 if failures > 0 {
     print("\(failures) Logik-Test(s) fehlgeschlagen")

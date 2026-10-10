@@ -179,6 +179,15 @@ struct QuestsPage: View {
 /// Farben zum Freischalten.
 struct ThemesPage: View {
     @EnvironmentObject private var store: Store
+    @AppStorage("dotOutfits") private var outfitsOn = true
+    @State private var trying: DotOutfit?          // nur Anprobe, wird nicht gespeichert
+
+    private var outfitText: String {
+        guard outfitsOn else { return "Aus – \(store.dotName) bleibt immer gleich." }
+        let today = Outfit.today(Date())
+        let now = today == .none ? "Heute nichts – vielleicht morgen." : "Heute: \(today.name)."
+        return "Je nach Jahreszeit und manchmal einfach so – oben zum Anprobieren antippen. \(now)"
+    }
 
     var body: some View {
         List {
@@ -196,6 +205,42 @@ struct ThemesPage: View {
                 .padding(.vertical, 6)
             } footer: {
                 Text("Neue Farben schaltest du mit Leveln frei.")
+            }
+            .dopaRow()
+
+            Section {
+                HStack {
+                    Spacer()
+                    DotView(level: store.level, size: 110, tappable: true, outfitOverride: trying)
+                        .padding(.top, 26).padding(.bottom, 10)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: trying)
+                    Spacer()
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(DotOutfit.allCases.filter { $0 != .none }, id: \.self) { outfit in
+                            Button {
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                trying = trying == outfit ? nil : outfit
+                            } label: {
+                                Text(outfit.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(trying == outfit ? Color.white : Color(hex: 0xC5BDCA))
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 32)
+                                    .background(trying == outfit ? store.theme.accent : DS.field, in: Capsule())
+                            }
+                            .buttonStyle(PressStyle())
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                Toggle(isOn: $outfitsOn.animation(.spring(response: 0.35, dampingFraction: 0.7))) {
+                    SettingsRow(icon: "tshirt.fill", color: .orange, title: "\(store.dotName) verkleidet sich")
+                }
+                .tint(store.theme.accent)
+            } footer: {
+                Text(outfitText)
             }
             .dopaRow()
         }

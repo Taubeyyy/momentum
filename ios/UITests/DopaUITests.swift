@@ -36,6 +36,22 @@ final class DopaUITests: XCTestCase {
             button.tap()
             sleep(1)
             shot(String(format: "%02d-%@", i + 3, tab))
+            // „Dot zieht für dich“: Karte ziehen, Foto, wieder zu
+            if tab == "Machen" {
+                let draw = app.buttons["Ziehen"].firstMatch
+                if draw.waitForExistence(timeout: 3) {
+                    draw.tap()
+                    let pull = app.buttons["Karte ziehen"].firstMatch
+                    if pull.waitForExistence(timeout: 4) {
+                        pull.tap()
+                        sleep(2)
+                        shot("03b-ziehen")
+                    }
+                    let close = app.buttons["Schließen"].firstMatch
+                    if close.waitForExistence(timeout: 3) { close.tap() }
+                    sleep(1)
+                }
+            }
         }
 
         // „Mehr“-Bubble: Geld und Schlaf

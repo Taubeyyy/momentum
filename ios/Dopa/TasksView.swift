@@ -15,6 +15,7 @@ struct TasksView: View {
     @State private var showAudio = false
     @State private var showWords = false
     @State private var showWhatNow = false
+    @State private var showDraw = false
     @State private var choosingPhoto = false
     @State private var photo: PickedImage?
     @State private var completing: Set<UUID> = []   // gerade abgehakt, rutscht gleich weg
@@ -91,12 +92,14 @@ struct TasksView: View {
                 .environmentObject(store)
                 .presentationDetents([.medium, .large])
             }
+            .sheet(isPresented: $showDraw) { DrawSheet().environmentObject(store) }
             .photoSource(isPresented: $choosingPhoto, title: "Brief, Zettel oder Whiteboard") { photo = PickedImage(image: $0) }
             .sheet(item: $photo) { picked in
                 PhotoDumpSheet(image: picked.image).environmentObject(store)
             }
             .onAppear(perform: handleStartRequest)
             .onChange(of: router.startTask) { _ in handleStartRequest() }
+            .onChange(of: router.drawRequest) { _ in showDraw = true }
         }
     }
 
@@ -107,6 +110,7 @@ struct TasksView: View {
         HStack(spacing: 6) {
             tool("Was jetzt?", symbol: "sparkles", prominent: true) { showWhatNow = true }
             if store.data.focus == nil {
+                tool("Ziehen", symbol: "rectangle.on.rectangle.angled") { showDraw = true }
                 tool("Timer", symbol: "timer") { freeStart = true }
             }
             if server.isConnected && server.aiAvailable {
@@ -116,10 +120,11 @@ struct TasksView: View {
                     Button { showPlan = true } label: { Label("Plan aus Text", systemImage: "text.alignleft") }
                     Button { showWords = true } label: { Label("Worte finden", systemImage: "text.bubble") }
                 } label: {
-                    Label("Mehr", systemImage: "ellipsis.circle")
-                        .font(.system(size: 13, weight: .semibold))
+                    Label("Mehr", systemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Color(hex: 0xC5BDCA))
-                        .padding(.horizontal, 13)
+                        .frame(width: 36)
                         .frame(height: 36)
                         .background(DS.raised, in: Capsule())
                         .overlay(Capsule().stroke(DS.line))

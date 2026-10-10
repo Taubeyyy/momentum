@@ -172,6 +172,15 @@ struct DotGreeting: View {
     }
 
     @ViewBuilder private var timerButton: some View {
+        if store.data.focus == nil && !store.openTasks.isEmpty {
+            Button {
+                Router.shared.doSection = .tasks
+                Router.shared.go(.tasks)
+                Router.shared.drawRequest += 1
+            } label: {
+                Label("\(store.dotName) zieht für dich", systemImage: "rectangle.on.rectangle.angled")
+            }
+        }
         if store.data.focus == nil {
             Button {
                 store.startFocus(taskID: nil, title: "Fokus", step: "", minutes: 10)

@@ -71,6 +71,7 @@ final class Router: ObservableObject {
     @Published var morningRequest = 0       // hochzählen = Morgen-Checkliste öffnen
     @Published var eveningRequest = 0       // hochzählen = Abendroutine öffnen
     @Published var startTask: UUID?         // „Hilf mir anfangen“ für diese Aufgabe öffnen
+    @Published var drawRequest = 0          // hochzählen = „Dot zieht für dich“ in „Machen“ öffnen
     @Published var feedbackRequest = 0      // hochzählen = Feedback-Fenster (Schütteln) auf der sichtbaren Seite
     @Published var doSection = DoSection.tasks     // „Machen“: Aufgaben oder Plan
     @Published var moreItem = MoreItem.money       // was unter „Mehr“ offen ist
@@ -300,6 +301,17 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
+        .overlay {
+            // seltene Überraschung nach dem Abhaken (nicht, solange Level-Up oder Startbild läuft)
+            if let event = store.surprise, levelUp == nil, !splash {
+                SurpriseOverlay(event: event) {
+                    if store.surprise?.id == event.id { store.surprise = nil }
+                }
+                .id(event.id)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: store.surprise)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: toast)
         .animation(.easeInOut(duration: 0.25), value: levelUp)
         .onChange(of: store.lastAward) { award in

@@ -43,6 +43,7 @@ struct DotView: View {
     var animated = true
     var expression: DotExpression = .auto
     var tappable = false                    // antippen = Dot freut sich kurz
+    var outfitOverride: DotOutfit? = nil    // Anprobe im Profil
     @ObservedObject private var store = Store.shared
     @State private var breathe = false
     @State private var spin = false
@@ -54,7 +55,14 @@ struct DotView: View {
     @State private var wink = false
     @State private var taps = 0
     @State private var burstAt: Date?
+    @AppStorage("dotOutfits") private var outfitsOn = true      // Dot verkleidet sich (Profil → Farben)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Verkleidung des Tages – oder keine, wenn ausgeschaltet.
+    private var outfit: DotOutfit {
+        if let outfitOverride { return outfitOverride }
+        return outfitsOn ? Outfit.today(Date()) : .none
+    }
 
     private var stage: DotStage { DotStage.of(level: level) }
     private var accent: Color { store.theme.accent }
@@ -141,7 +149,11 @@ struct DotView: View {
                                       lineWidth: max(0.8, orb * 0.022))
                 }
                 if size >= 22 { face }
-                if size >= 22 && level >= 3 { sprout }
+                if size >= 22 && level >= 3 && !outfit.onHead { sprout }
+                if size >= 30 && outfit != .none {
+                    DotOutfitView(outfit: outfit, orb: orb, accent: accent)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
             }
             .frame(width: orb, height: orb)
             .shadow(color: accent.opacity(0.55), radius: size * 0.07)
