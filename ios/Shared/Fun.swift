@@ -120,7 +120,11 @@ enum Outfit {
     /// Fester Zufallswert pro Tag (0..<100) – derselbe Tag ergibt immer dasselbe Outfit.
     static func dayRoll(_ date: Date, salt: Int, calendar: Calendar = .current) -> Int {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
-        var x = UInt64((c.year ?? 0) * 10_000 + (c.month ?? 0) * 100 + (c.day ?? 0) + salt * 7919)
+        let year: Int = c.year ?? 0
+        let month: Int = c.month ?? 0
+        let dayOfMonth: Int = c.day ?? 0
+        let seed: Int = year * 10_000 + month * 100 + dayOfMonth + salt * 7919
+        var x = UInt64(max(0, seed))
         x = (x ^ (x >> 16)) &* 0x45d9f3b
         x = (x ^ (x >> 16)) &* 0x45d9f3b
         x = x ^ (x >> 16)

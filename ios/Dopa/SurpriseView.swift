@@ -103,9 +103,12 @@ struct ConfettiBurst: View {
                     guard t < length else { return }
                     for i in 0..<count {
                         let p = Self.particle(i)
-                        let x = p.x * size.width + CGFloat(sin(t * p.wobble + p.phase)) * 18 + CGFloat(p.drift * t) * 30
-                        let y = -20 + CGFloat(p.speed * t + 160 * t * t) - CGFloat(p.delay) * 60
-                        let fade = t > length - 0.5 ? (length - t) / 0.5 : 1
+                        let sway: Double = sin(t * p.wobble + p.phase) * 18
+                        let driftX: Double = p.drift * t * 30
+                        let x: CGFloat = p.x * size.width + CGFloat(sway + driftX)
+                        let fall: Double = p.speed * t + 160 * t * t
+                        let y: CGFloat = CGFloat(fall - 20 - p.delay * 60)
+                        let fade: Double = t > length - 0.5 ? (length - t) / 0.5 : 1
                         var piece = gc
                         piece.opacity = max(0, fade)
                         piece.translateBy(x: x, y: y)
@@ -131,8 +134,12 @@ struct ConfettiBurst: View {
             let v = sin(Double(i * 127 + salt * 311)) * 43_758.545_3
             return v - floor(v)
         }
-        return Particle(x: CGFloat(r(1)), speed: 220 + r(2) * 260, wobble: 2 + r(3) * 4, phase: r(4) * 6.28,
-                        drift: r(5) - 0.5, spin: 2 + r(6) * 6, w: CGFloat(6 + r(7) * 5), h: CGFloat(4 + r(8) * 8),
-                        delay: r(9))
+        let speed: Double = 220 + r(2) * 260
+        let wobble: Double = 2 + r(3) * 4
+        let spin: Double = 2 + r(6) * 6
+        let width: Double = 6 + r(7) * 5
+        let height: Double = 4 + r(8) * 8
+        return Particle(x: CGFloat(r(1)), speed: speed, wobble: wobble, phase: r(4) * 6.28,
+                        drift: r(5) - 0.5, spin: spin, w: CGFloat(width), h: CGFloat(height), delay: r(9))
     }
 }
