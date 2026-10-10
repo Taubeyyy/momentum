@@ -111,6 +111,31 @@ enum Offers {
         return search(key, in: flyers, now: now).first
     }
 
+    /// Prospekt-Link aus geteiltem Text („Sieh dir mal diesen Kaufland-Prospekt … an! https://…“).
+    /// kaufDA teilt einen Weiterleitungs-Link (adj.st) – dahinter steckt in `adjust_fallback` die Web-Ansicht.
+    static func flyerURL(from text: String) -> URL? {
+        let candidates: [String] = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            .filter { $0.hasPrefix("http://") || $0.hasPrefix("https://") }
+        guard let raw = candidates.first, let url = URL(string: raw) else { return nil }
+        if let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let fallback = parts.queryItems?.first(where: { $0.name == "adjust_fallback" })?.value,
+           let target = URL(string: fallback), target.scheme == "https" {
+            return target
+        }
+        return url.scheme == "https" ? url : nil
+    }
+
+    /// Seiten desselben Prospekts zusammenlegen: gleiche Angebote (Name, Groß/klein egal) nur einmal.
+    static func merge(_ offers: [Offer], into existing: [Offer]) -> [Offer] {
+        var seen = Set(existing.map { $0.name.lowercased() })
+        var result = existing
+        for offer in offers where !seen.contains(offer.name.lowercased()) {
+            seen.insert(offer.name.lowercased())
+            result.append(offer)
+        }
+        return result
+    }
+
     /// „Lidl 0,99 € (100 g) · bis Sa 11.10.“
     static func dealText(_ hit: (offer: Offer, flyer: Flyer), now: Date) -> String {
         var s = hit.flyer.storeName

@@ -22,6 +22,12 @@ struct ShopView: View {
     @State private var readingFlyer = false
     @State private var offerQuery = ""
     @State private var scanningBarcode = false
+    @State private var flyerLink: FlyerLink?       // geöffneter Prospekt-Link
+
+    struct FlyerLink: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
     @ObservedObject private var router = Router.shared
     @ObservedObject private var server = Server.shared
     @FocusState private var focused: Bool
@@ -125,6 +131,15 @@ struct ShopView: View {
         suggestions
     }
 
+    /// Geteilter Prospekt-Link (kaufDA „Teilen → Kopieren“) aus der Zwischenablage → in Dopa öffnen.
+    private func pasteFlyerLink() {
+        if let text = UIPasteboard.general.string, let url = Offers.flyerURL(from: text) {
+            flyerLink = FlyerLink(url: url)
+        } else {
+            Toaster.shared.show("Erst in kaufDA „Teilen → Kopieren“, dann hier einfügen")
+        }
+    }
+
     /// Preis-Eingabe öffnen (vorausgefüllt mit dem aktuellen Preis).
     private func editPrice(_ item: ShopItem) {
         priceText = store.shopPrice(item).map { String(format: "%.2f", $0).replacingOccurrences(of: ".", with: ",") } ?? ""
@@ -151,6 +166,17 @@ struct ShopView: View {
             }
         }
         .photoSource(isPresented: $choosingFlyer, title: "Prospekt (Foto oder Screenshot)") { scanFlyer($0) }
+        .sheet(item: $flyerLink) { link in
+            FlyerBrowser(url: link.url).environmentObject(store)
+        }
+
+        if server.isConnected && server.aiAvailable {
+            Button(action: pasteFlyerLink) {
+                Label("Prospekt-Link einfügen", systemImage: "link")
+            }
+            .buttonStyle(PillButtonStyle())
+            .padding(.bottom, 10)
+        }
 
         if readingFlyer {
             HStack(spacing: 8) {
@@ -162,7 +188,7 @@ struct ShopView: View {
 
         if flyers.isEmpty {
             EmptyState(symbol: "", title: "Noch kein Prospekt",
-                       text: "Plus oben: Prospekt fotografieren oder Screenshot aus der kaufDA-App. Dopa liest Angebote, Preise und bis wann sie gelten – und zeigt sie bei deiner Liste.")
+                       text: "In kaufDA „Teilen → Kopieren“ und hier „Prospekt-Link einfügen“ – oder Plus oben für Foto/Screenshot. Dopa liest Angebote, Preise und bis wann sie gelten – und zeigt sie bei deiner Liste.")
         } else {
             SearchField(text: $offerQuery, prompt: "Im Prospekt suchen, z. B. Butter")
                 .padding(.bottom, 8)

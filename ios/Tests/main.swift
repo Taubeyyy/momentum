@@ -88,6 +88,13 @@ let noDate = Flyer(store: "", added: day(2026, 10, 1), offers: [])
 expect(Offers.isActive(noDate, now: fNow), true, "ohne Datum 10 Tage gültig")
 expect(Offers.isActive(noDate, now: day(2026, 10, 12)), false, "danach weg")
 
+// Prospekt-Link aus kaufDA („Teilen“-Text mit Weiterleitungs-Link)
+let sharedFlyerText = "Sieh dir mal diesen Kaufland-Prospekt in der kaufDA App an! https://nfx6.adj.st/brochureviewer/9cbe/0?adjust_t=z&adjust_fallback=https://www.kaufda.de/contentViewer/static/9cbe?page=1"
+expect(Offers.flyerURL(from: sharedFlyerText)?.host, "www.kaufda.de", "Web-Ansicht hinter dem Weiterleitungs-Link")
+expect(Offers.flyerURL(from: "https://www.kaufda.de/x")?.absoluteString, "https://www.kaufda.de/x", "direkter Link")
+expect(Offers.flyerURL(from: "kein Link hier") == nil, true, "ohne Link nichts")
+expect(Offers.merge([Offer(name: "Butter"), Offer(name: "Milch")], into: [Offer(name: "butter")]).count, 2, "Seiten ohne Doppelte")
+
 // Kontostand vom Screenshot
 let oldData = try! JSONDecoder().decode(AppData.self, from: #"{"tasks":[]}"#.data(using: .utf8)!)
 expect(oldData.bank == nil, true, "ohne Kontostand lesbar")

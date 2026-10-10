@@ -1663,9 +1663,20 @@ final class Store: ObservableObject {
     @discardableResult
     func addFlyer(_ scan: Server.FlyerScan) -> Flyer {
         let offers: [Offer] = scan.offers.map { Offer(name: $0.name, price: $0.price, unit: $0.unit, note: $0.note) }
-        let flyer = Flyer(store: scan.store, validFrom: Self.scanDate(scan.validFrom),
-                          validTo: Self.scanDate(scan.validTo), offers: offers)
-        data.flyers = Offers.active(data.flyers, now: Date()) + [flyer]
+        let validTo = Self.scanDate(scan.validTo)
+        var flyers = Offers.active(data.flyers, now: Date())
+        // weitere Seite desselben Prospekts (gleicher Laden, gleiches Ende, heute eingelesen) → zusammenlegen
+        if let i = flyers.firstIndex(where: { f in
+            !scan.store.isEmpty && f.store.lowercased() == scan.store.lowercased()
+                && f.validTo == validTo && Calendar.current.isDateInToday(f.added)
+        }) {
+            flyers[i].offers = Offers.merge(offers, into: flyers[i].offers)
+            data.flyers = flyers
+            save()
+            return flyers[i]
+        }
+        let flyer = Flyer(store: scan.store, validFrom: Self.scanDate(scan.validFrom), validTo: validTo, offers: offers)
+        data.flyers = flyers + [flyer]
         save()
         return flyer
     }
