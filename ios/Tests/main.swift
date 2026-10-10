@@ -438,7 +438,8 @@ expect((try? JSONDecoder().decode([DotMessage].self, from: oldChat))?.first?.act
 
 // Mitteilungen ohne Abnutzung
 expect(NoteVariety.weeklyCount(slots: 3, fixed: 10), 3, "Essen bekommt Wochentags-Texte")
-expect(NoteVariety.weeklyCount(slots: 10, fixed: 10), 3, "Budget begrenzt")
+expect(NoteVariety.weeklyCount(slots: 10, fixed: 10), 6, "Budget begrenzt")
+expect(NoteVariety.weeklyCount(slots: 10, fixed: 30), 3, "weniger Platz, weniger Varianten")
 expect(NoteVariety.weeklyCount(slots: 4, fixed: 55), 0, "kein Platz, täglich gleich")
 expect(NoteVariety.weeklyCount(slots: 0, fixed: 0), 0, "nichts zu planen")
 struct TestRNG: RandomNumberGenerator {
