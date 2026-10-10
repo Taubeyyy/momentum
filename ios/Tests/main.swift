@@ -61,6 +61,15 @@ expect(DotAction(kind: .edit, title: "x", key: "quatsch").label, "Einstellung ä
 expect(DotAction(kind: .edit, title: "", key: "chat.clear").label, "Unser Gespräch leeren", "Chat leeren")
 expect(DotAction(kind: .edit, title: "Herd ist aus", key: "memo.delete").label, "Notiz löschen · Herd ist aus", "Notiz löschen")
 
+// Eigene Preise: pro Stück gemerkt
+expect(PriceBook.count("2x Milch"), 2, "2x")
+expect(PriceBook.count("3 Äpfel"), 3, "3 Stück")
+expect(PriceBook.count("1 kg Mehl"), 1, "Größe zählt als 1")
+expect(PriceBook.count("Milch"), 1, "ohne Menge")
+expect(PriceBook.unitPrice(total: 2.18, name: "2x Milch"), 1.09, "Stückpreis")
+expect(PriceBook.price(for: "3x Milch", own: ["milch": 1.09]), 3.27, "nächstes Mal × Menge")
+expect(PriceBook.price(for: "Butter", own: ["milch": 1.09]) == nil, true, "kein eigener Preis")
+
 // Prospekte: Gültigkeit, Suche, Angebot zur Einkaufsliste
 let fNow = day(2026, 10, 10, 12)                                    // Samstag
 let lidl = Flyer(store: "Lidl", validFrom: day(2026, 10, 6), validTo: day(2026, 10, 11),

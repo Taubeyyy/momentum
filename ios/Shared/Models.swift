@@ -449,7 +449,8 @@ struct AppData: Codable {
     var checkins: [CheckIn] = []
     var shopPlaces = ShopPlace.defaults
     var lastPlace: UUID?
-    var shopPrices: [String: Double] = [:]          // „2x milch“ → 2,18 (geschätzt oder von dir)
+    var shopPrices: [String: Double] = [:]          // „2x milch“ → 2,18 (geschätzt)
+    var ownPrices: [String: Double] = [:]           // „milch“ → 1,09 pro Stück (von dir eingetragen, schlägt die Schätzung)
     var shopPricesOn = true
     var evening = Evening()
     var companion: CompanionScript?                 // Dots Sätze für einen Tag (Gemini)
@@ -518,6 +519,7 @@ extension AppData {
         shopPlaces = c.value(.shopPlaces, or: ShopPlace.defaults)
         lastPlace = c.value(.lastPlace, or: nil)
         shopPrices = c.value(.shopPrices, or: [:])
+        ownPrices = c.value(.ownPrices, or: [:])
         shopPricesOn = c.value(.shopPricesOn, or: true)
         evening = c.value(.evening, or: Evening())
         companion = c.value(.companion, or: nil)

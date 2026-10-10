@@ -203,8 +203,11 @@ final class Server: ObservableObject {
     struct Prices: Decodable { let prices: [String: Double] }
 
     /// Name → ungefährer Preis in Euro (nur was Gemini sinnvoll schätzen konnte).
-    func prices(_ names: [String]) async throws -> [String: Double] {
-        let res: Prices = try await call("/api/dopa/prices", method: "POST", body: ["items": names])
+    struct PricesBody: Encodable { let items: [String]; let known: String }
+
+    /// `known` = deine eigenen Preise („Milch 1,09 €; Butter 1,79 €“) – die KI schätzt daran ausgerichtet.
+    func prices(_ names: [String], known: String = "") async throws -> [String: Double] {
+        let res: Prices = try await call("/api/dopa/prices", method: "POST", body: PricesBody(items: names, known: known))
         return res.prices
     }
 

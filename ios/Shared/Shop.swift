@@ -76,6 +76,34 @@ enum ShopCategory: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Eigene Preise: pro Stück gemerkt („2x Milch“ für 2,18 € → Milch 1,09 €), beim nächsten Mal × Menge.
+enum PriceBook {
+    /// Wie viele Stück? „2x Milch“, „2 x Milch“, „3 Äpfel“ → 2, 2, 3. Größen („1 kg Mehl“, „500 g“) zählen als 1.
+    static func count(_ name: String) -> Int {
+        let words: [String] = name.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let first = words.first, words.count > 1 else { return 1 }
+        let sizes: Set<String> = ["kg", "g", "l", "ml", "gramm", "liter"]
+        var n: Int?
+        if first.hasSuffix("x"), let value = Int(first.dropLast()) {
+            n = value
+        } else if let value = Int(first), !sizes.contains(words[1]) {
+            n = value
+        }
+        return min(50, max(1, n ?? 1))
+    }
+
+    /// Preis pro Stück aus einem eingetragenen Gesamtpreis.
+    static func unitPrice(total: Double, name: String) -> Double {
+        (total / Double(count(name)) * 100).rounded() / 100
+    }
+
+    /// Eigener Preis für einen Eintrag: Stückpreis × Menge, sonst nil.
+    static func price(for name: String, own: [String: Double]) -> Double? {
+        guard let unit = own[ShopText.key(name)] else { return nil }
+        return (unit * Double(count(name)) * 100).rounded() / 100
+    }
+}
+
 enum ShopText {
     /// „2x Milch“, „1 kg Mehl“ → „milch“, „mehl“ – damit die Kauf-Statistik zusammenpasst.
     static func key(_ name: String) -> String {

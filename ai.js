@@ -847,13 +847,15 @@ meals = 2 Essens-Erinnerungen.`,
 }
 
 /* Einkauf: ungefährer Preis pro Eintrag (deutscher Discounter/Supermarkt), nur zur Orientierung. */
-async function prices({ items }) {
+async function prices({ items, known }) {
   return ask({
     system: `Schätze für jeden Einkaufs-Eintrag den üblichen Preis in Euro in einem deutschen Supermarkt
 (Discounter-Niveau wie Lidl/Aldi, Stand heute). Mengenangaben im Eintrag beachten ("2x Milch" = zwei Packungen).
 Ohne Mengenangabe: eine übliche Packung. Nur eine Zahl pro Eintrag, in derselben Reihenfolge.
-Wenn es kein Supermarkt-Artikel ist oder du es nicht weißt: 0.`,
-    user: items.map((n, i) => `${i + 1}. ${n}`).join('\n'),
+Wenn es kein Supermarkt-Artikel ist oder du es nicht weißt: 0.
+Stehen unten Preise, die die Person selbst bezahlt hat: daran orientieren (ihr Laden, ihr Preisniveau) –
+ähnliche Sachen ähnlich teuer schätzen.`,
+    user: (known ? `Selbst bezahlt (pro Stück): ${known}\n\n` : '') + items.map((n, i) => `${i + 1}. ${n}`).join('\n'),
     schema: obj({
       prices: { type: 'array', items: { type: 'number' } }
     }),

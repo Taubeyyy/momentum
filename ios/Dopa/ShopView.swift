@@ -60,7 +60,7 @@ struct ShopView: View {
                 }
                 Button("Abbrechen", role: .cancel) { pricing = nil }
             } message: {
-                Text("Gilt ab jetzt statt der Schätzung.")
+                Text("Preis für die ganze Menge. Dopa merkt sich den Stückpreis und nimmt ihn nächstes Mal statt zu schätzen. Leer lassen = wieder schätzen.")
             }
         }
     }
@@ -123,6 +123,12 @@ struct ShopView: View {
         cart
         offersSection
         suggestions
+    }
+
+    /// Preis-Eingabe öffnen (vorausgefüllt mit dem aktuellen Preis).
+    private func editPrice(_ item: ShopItem) {
+        priceText = store.shopPrice(item).map { String(format: "%.2f", $0).replacingOccurrences(of: ".", with: ",") } ?? ""
+        pricing = item
     }
 
     /// Passendes Angebot aus einem gültigen Prospekt für einen Listen-Eintrag.
@@ -343,14 +349,12 @@ struct ShopView: View {
                             HairlineList {
                                 ForEach(items) { item in
                                     ShopLine(item: item, done: checking.contains(item.id), price: store.shopPrice(item),
-                                             deal: dealText(for: item)) { toggle(item) }
+                                             own: store.isOwnPrice(item), deal: dealText(for: item),
+                                             onPrice: { editPrice(item) }) { toggle(item) }
                                         .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity),
                                                                 removal: .opacity))
                                         .contextMenu {
-                                            Button {
-                                                priceText = store.shopPrice(item).map { String(format: "%.2f", $0).replacingOccurrences(of: ".", with: ",") } ?? ""
-                                                pricing = item
-                                            } label: { Label("Preis ändern", systemImage: "eurosign") }
+                                            Button { editPrice(item) } label: { Label("Preis eintragen", systemImage: "eurosign") }
                                             Menu("In anderen Gang") {
                                                 ForEach(ShopCategory.allCases.filter { $0 != item.category }) { other in
                                                     Button(other.label) { store.setCategory(item.id, other) }
@@ -522,37 +526,58 @@ struct ShopLine: View {
     let item: ShopItem
     let done: Bool
     var price: Double?
+    var own = false                 // selbst eingetragener Preis (ohne „~“)
     var deal: String?               // „Lidl 0,99 € · bis Sa“ – passendes Angebot aus einem Prospekt
+    var onPrice: (() -> Void)?      // Preis antippen = selbst eintragen
     let onToggle: () -> Void
 
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 13) {
-                CheckBox(done: done)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .strikethrough(done)
-                        .foregroundStyle(DS.ink)
-                        .animation(.easeOut(duration: 0.2), value: done)
-                    if let deal, !done {
-                        Label(deal, systemImage: "tag.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0x4ADE80))
-                            .lineLimit(1)
+        HStack(spacing: 8) {
+            Button(action: onToggle) {
+                HStack(spacing: 13) {
+                    CheckBox(done: done)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .strikethrough(done)
+                            .foregroundStyle(DS.ink)
+                            .animation(.easeOut(duration: 0.2), value: done)
+                        if let deal, !done {
+                            Label(deal, systemImage: "tag.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color(hex: 0x4ADE80))
+                                .lineLimit(1)
+                        }
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-                if let price {
-                    Text("~\(MoneyMath.euro(price))")
-                        .font(.system(size: 12)).monospacedDigit()
-                        .foregroundStyle(DS.faint)
-                }
+                .contentShape(Rectangle())
             }
-            .hairlineRow(minHeight: 54)
-            .opacity(done ? 0.48 : 1)
+            .buttonStyle(.plain)
+            priceView
         }
-        .buttonStyle(.plain)
+        .hairlineRow(minHeight: 54)
+        .opacity(done ? 0.48 : 1)
+    }
+
+    /// Eigener Preis normal, Schätzung mit „~“; ohne Preis ein leises „€“ zum Eintragen.
+    @ViewBuilder
+    private var priceView: some View {
+        let label: Text = price.map { own ? Text(MoneyMath.euro($0)) : Text("~\(MoneyMath.euro($0))") } ?? Text("€ +")
+        let styled = label
+            .font(.system(size: own ? 13 : 12, weight: own ? .semibold : .regular)).monospacedDigit()
+            .foregroundStyle(own ? Color(hex: 0xC7BECB) : DS.faint)
+        if let onPrice, !done {
+            Button(action: onPrice) {
+                styled
+                    .padding(.vertical, 8).padding(.leading, 8)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(price == nil ? "Preis eintragen" : "Preis ändern")
+        } else if price != nil {
+            styled
+        }
     }
 }
 

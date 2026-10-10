@@ -961,7 +961,7 @@ app.post('/api/dopa/prices', auth, aiLimit, async (req, res) => {
   const items = (Array.isArray(req.body?.items) ? req.body.items : []).map(i => str(i, 80).trim()).filter(Boolean).slice(0, 40);
   if (!items.length) return res.status(400).json({ error: 'leer' });
   try {
-    const { data, provider } = await ai.prices({ items });
+    const { data, provider } = await ai.prices({ items, known: str(req.body?.known, 1500).trim() });
     const result = {};
     items.forEach((name, i) => {
       const euro = Number(data.prices?.[i]);

@@ -418,8 +418,16 @@ final class Store: ObservableObject {
 
     private static func priceKey(_ name: String) -> String { name.lowercased().trimmingCharacters(in: .whitespaces) }
 
+    /// Dein eigener Preis (pro Stück × Menge) schlägt die Schätzung. Eigene Preise zeigt Dopa auch,
+    /// wenn die Schätzungen ausgeschaltet sind.
     func shopPrice(_ item: ShopItem) -> Double? {
-        data.shopPricesOn ? data.shopPrices[Self.priceKey(item.name)] : nil
+        if let own = PriceBook.price(for: item.name, own: data.ownPrices) { return own }
+        return data.shopPricesOn ? data.shopPrices[Self.priceKey(item.name)] : nil
+    }
+
+    /// Hast du den Preis selbst eingetragen? (dann ohne „~“ anzeigen)
+    func isOwnPrice(_ item: ShopItem) -> Bool {
+        data.ownPrices[ShopText.key(item.name)] != nil
     }
 
     /// Summe der Schätzungen; `known` = wie viele davon einen Preis haben.
@@ -431,16 +439,30 @@ final class Store: ObservableObject {
     /// Fehlende Preise bei Gemini schätzen lassen (eine Anfrage für alle).
     func estimatePrices() async {
         guard data.shopPricesOn, Server.shared.isConnected, Server.shared.aiAvailable else { return }
-        let missing = shopOpen.map(\.name).filter { data.shopPrices[Self.priceKey($0)] == nil }
-        guard !missing.isEmpty, let result = try? await Server.shared.prices(Array(missing.prefix(40))) else { return }
+        let missing = shopOpen.map(\.name).filter {
+            data.shopPrices[Self.priceKey($0)] == nil && PriceBook.price(for: $0, own: data.ownPrices) == nil
+        }
+        // deine eigenen Preise als Richtwert mitschicken (höchstens 30)
+        let known: String = data.ownPrices.sorted { $0.key < $1.key }.prefix(30)
+            .map { "\($0.key) \(MoneyMath.euro($0.value))" }.joined(separator: "; ")
+        guard !missing.isEmpty,
+              let result = try? await Server.shared.prices(Array(missing.prefix(40)), known: known) else { return }
         for (name, euro) in result { data.shopPrices[Self.priceKey(name)] = euro }
         if data.shopPrices.count > 600 { data.shopPrices = [:] }    // Notbremse, falls die Liste ausufert
         save()
     }
 
-    /// Preis von Hand – zählt ab jetzt statt der Schätzung.
+    /// Preis von Hand – pro Stück gemerkt und beim nächsten Mal statt der Schätzung genommen.
+    /// Leer/0 = eigenen Preis vergessen, dann schätzt Dopa wieder.
     func setShopPrice(_ item: ShopItem, _ euro: Double?) {
-        data.shopPrices[Self.priceKey(item.name)] = euro.flatMap { $0 > 0 ? $0 : nil }
+        let key = ShopText.key(item.name)
+        data.shopPrices[Self.priceKey(item.name)] = nil
+        if let euro, euro > 0 {
+            data.ownPrices[key] = PriceBook.unitPrice(total: euro, name: item.name)
+        } else {
+            data.ownPrices[key] = nil
+            Task { await estimatePrices() }
+        }
         save()
     }
 
