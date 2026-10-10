@@ -747,7 +747,9 @@ Vorschläge zum Antippen ("actions", höchstens 4, oft keine):
   reminder.time (title = Erinnerung, time) · reminder.delete (title) · habit.add (step = Name, time optional, minutes = pro Tag) ·
   habit.remove (title) · habit.time (title, time; "" = ohne Erinnerung) · task.rename (title = alt, step = neu) ·
   task.delete (title) · task.plan (title, day; -1 = irgendwann) · task.time (title, time, day) · shop.remove (title) ·
-  timer.presets (items ["5","15","25"]) · snooze (minutes) · theme (step = Name einer freien Farbe) · dot.name (step).
+  timer.presets (items ["5","15","25"]) · snooze (minutes) · theme (step = Name einer freien Farbe) · dot.name (step) ·
+  Löschen auf Wunsch: memo.delete (title = Text der Notiz aus „Letzte Notizen“) · chat.clear (unser Gespräch leeren) ·
+  shop.clear (ganze Einkaufsliste leeren). Löschen nur, wenn die Person es ausdrücklich will.
   Bei title immer GENAU den Namen aus dem Kontext. Mehrere Änderungen = mehrere edit-Vorschläge (max. 4).
   Zum An-/Ausschalten und Pausieren weiter „setting“ nehmen.
 - schedule = mehrere Termine auf einmal eintragen (z. B. Wochenplan vom Foto): title = kurzer Name ("Seminarwoche"),
@@ -916,7 +918,52 @@ Fasse es für den Entwickler zusammen: gleiche Wünsche bündeln, Bugs von Wüns
   });
 }
 
+/* Prospekt (Foto/Screenshot, z. B. aus der kaufDA-App): Angebote mit Preis und Gültigkeit herauslesen. */
+async function flyerScan({ image, mime, todayLabel }) {
+  return ask({
+    system: `Auf dem Bild ist ein Supermarkt- oder Drogerie-Prospekt (Papier, Foto oder Screenshot einer Prospekt-App).
+Lies ALLE Angebote heraus:
+- "store": Händler ("Lidl", "Rewe", "dm" …), "" wenn nicht erkennbar.
+- "validFrom"/"validTo": Gültigkeit als YYYY-MM-DD („gültig ab Mo. 13.10.“, „bis Samstag“ – aus „heute“ ausrechnen,
+  fehlt das Jahr: aktuelles bzw. nächstes passendes). Nicht erkennbar: "".
+- "offers": je Angebot "name" (Produkt kurz und suchbar, z. B. "Milka Alpenmilch Schokolade"), "price" in Euro
+  (Angebotspreis, 0 wenn keiner), "unit" (z. B. "100 g", "6 x 1,5 l", "" sonst), "note" (z. B. "-30 %", "nur mit App", "").
+Nichts erfinden. Unleserliches weglassen.`,
+    user: `Heute ist ${todayLabel}. Welche Angebote stehen im Prospekt?`,
+    schema: obj({
+      store: { type: 'string' },
+      validFrom: { type: 'string' },
+      validTo: { type: 'string' },
+      offers: {
+        type: 'array', maxItems: 80,
+        items: obj({ name: { type: 'string' }, price: { type: 'number' }, unit: { type: 'string' }, note: { type: 'string' } })
+      }
+    }),
+    media: [{ kind: 'image', mime, data: image }],
+    maxTokens: 4000,
+    big: true
+  });
+}
+
+/* Barcode → Produktname aus Open Food Facts (frei, ohne Key). Kein KI-Aufruf, liegt hier, damit Tests es ersetzen können. */
+async function productLookup(code) {
+  const url = `https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_de,brands,quantity`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Dopa/1.0 (https://dopa.taubey.com)' },
+    signal: AbortSignal.timeout(6000)
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const p = data?.product;
+  if (data?.status !== 1 || !p) return null;
+  const name = String(p.product_name_de || p.product_name || '').trim();
+  if (!name) return null;
+  const brand = String(p.brands || '').split(',')[0].trim();
+  return { name, brand, quantity: String(p.quantity || '').trim() };
+}
+
 module.exports = {
+  flyerScan, productLookup,
   enabled, describe, providers, ask, parseJSON, AISLES,
   breakdown, estimate, compile, rewrite, interpret, whatNow, reentry, firstStep, plan,
   categorize, prices, companionDay, photoDump, photoCaption, moneyScan, moneyTips, transcribe, dopaNext, summarizeFeedback, dump, dotAnswer, dotChat,

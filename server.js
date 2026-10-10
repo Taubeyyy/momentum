@@ -98,7 +98,7 @@ app.get('/dl/:token/:file', (req, res) => {
 const smallJSON = express.json({ limit: '256kb' });
 const mediaJSON = express.json({ limit: '10mb' });
 const MEDIA_PATHS = new Set(['/api/dopa/photo/dump', '/api/dopa/photo/caption', '/api/dopa/money/scan', '/api/dopa/voice',
-  '/api/dopa/chat']);   // Dot darf Fotos sehen (Wochenplan, Packliste)
+  '/api/dopa/chat', '/api/dopa/flyer']);   // Dot darf Fotos sehen (Wochenplan, Packliste), Prospekte
 app.use((req, res, next) => (MEDIA_PATHS.has(req.path) ? mediaJSON : smallJSON)(req, res, next));
 
 /* ---------- helpers ---------- */
@@ -732,7 +732,7 @@ const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorro
 const DOT_EDITS = ['morning.leave', 'morning.days', 'morning.add', 'morning.remove', 'evening.bed', 'evening.days',
   'evening.add', 'evening.remove', 'meals.times', 'nudges.window', 'reminder.time', 'reminder.delete', 'habit.add',
   'habit.remove', 'habit.time', 'task.rename', 'task.delete', 'task.plan', 'task.time', 'shop.remove',
-  'timer.presets', 'snooze', 'theme', 'dot.name'];
+  'timer.presets', 'snooze', 'theme', 'dot.name', 'memo.delete', 'chat.clear', 'shop.clear'];
 // Was Dot in der App einstellen darf (kind „setting“): title = einer davon, step = on/off
 const DOT_SETTINGS = ['morning', 'evening', 'nudges', 'meals', 'briefing', 'review', 'countdown', 'halfway'];
 
@@ -863,6 +863,46 @@ app.post('/api/dopa/money/scan', auth, aiLimit, async (req, res) => {
 });
 
 // Geld-Tipps aus dem Tagebuch dieses Monats
+// Prospekt-Foto → Angebote mit Preis und Gültigkeit
+app.post('/api/dopa/flyer', auth, aiLimit, async (req, res) => {
+  const media = mediaImage(req.body);
+  if (!media) return res.status(400).json({ error: 'kein Bild' });
+  const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && !isNaN(Date.parse(d));
+  try {
+    const { data, provider } = await ai.flyerScan({ ...media, todayLabel: berlinLabel() });
+    const price = v => { const n = Math.round(Number(v) * 100) / 100; return Number.isFinite(n) && n > 0 && n < 10000 ? n : 0; };
+    res.json({
+      store: str(data.store, 40).trim(),
+      validFrom: isDate(data.validFrom) ? data.validFrom : '',
+      validTo: isDate(data.validTo) ? data.validTo : '',
+      offers: (data.offers || []).map(o => ({
+        name: str(o.name, 80).trim(), price: price(o.price), unit: str(o.unit, 30).trim(), note: str(o.note, 40).trim()
+      })).filter(o => o.name).slice(0, 80),
+      provider
+    });
+  } catch (e) { aiFail(res, e); }
+});
+
+// Barcode (EAN) → Produktname (Open Food Facts), kurz zwischengespeichert
+const productCache = new Map();
+app.post('/api/dopa/barcode', auth, async (req, res) => {
+  const code = String(req.body?.code || '').trim();
+  if (!/^\d{8,14}$/.test(code)) return res.status(400).json({ error: 'kein Barcode' });
+  try {
+    if (!productCache.has(code)) {
+      productCache.set(code, await ai.productLookup(code));
+      if (productCache.size > 500) productCache.delete(productCache.keys().next().value);
+    }
+    const p = productCache.get(code);
+    if (!p) return res.json({ found: false });
+    const name = str(p.brand && !p.name.toLowerCase().includes(p.brand.toLowerCase()) ? `${p.brand} ${p.name}` : p.name, 80).trim();
+    res.json({ found: true, name, quantity: str(p.quantity, 30) });
+  } catch (e) {
+    productCache.delete(code);
+    res.json({ found: false });
+  }
+});
+
 app.post('/api/dopa/money/tips', auth, aiLimit, async (req, res) => {
   const summary = str(req.body?.summary, 3000).trim();
   if (!summary) return res.status(400).json({ error: 'leer' });

@@ -79,6 +79,15 @@ ai.moneyScan = async () => ({
   },
   provider: 'test'
 });
+ai.flyerScan = async () => ({
+  data: {
+    store: 'Lidl', validFrom: '2026-10-13', validTo: 'Samstag',
+    offers: [{ name: 'Milka Alpenmilch', price: 0.994, unit: '100 g', note: '-30 %' }, { name: '', price: 1, unit: '', note: '' },
+      { name: 'Butter', price: -3, unit: '250 g', note: '' }]
+  },
+  provider: 'test'
+});
+ai.productLookup = async code => (code === '4000417025005' ? { name: 'Alpenmilch Schokolade', brand: 'Milka', quantity: '100 g' } : null);
 ai.moneyTips = async ({ summary }) => ({ data: { tips: [summary.includes('Lieferando') ? 'Lieferando 4×' : 'nix'] }, provider: 'test' });
 ai.transcribe = async ({ hints }) => ({ data: { transcript: `Morgen um 8 Tabletten${hints ? ' (' + hints + ')' : ''}` }, provider: 'test' });
 ai.prices = async ({ items }) => ({ data: { prices: items.map(n => n === 'Milch' ? 1.09 : n === 'Auto' ? 9999 : 'x') }, provider: 'test' });
@@ -381,6 +390,16 @@ function check(name, cond, extra) {
   check('money/scan: Beträge positiv/gerundet, Unsinn raus, Raten begrenzt, max 3 Tipps',
     scan.body.entries?.length === 2 && scan.body.entries[0].amount === 23.46 && scan.body.entries[1].income === true
     && /^\d{4}-\d{2}-\d{2}$/.test(scan.body.entries[1].date) && scan.body.debts?.[0]?.remaining === 36 && scan.body.tips?.length === 3, scan.body);
+  const flyer = await app('POST', '/api/dopa/flyer', { image: img });
+  check('flyer: Angebote sauber, falsches Datum fliegt raus, Minuspreis wird 0',
+    flyer.body.store === 'Lidl' && flyer.body.validFrom === '2026-10-13' && flyer.body.validTo === ''
+    && flyer.body.offers?.length === 2 && flyer.body.offers[0].price === 0.99 && flyer.body.offers[1].price === 0, flyer.body);
+  const code = await app('POST', '/api/dopa/barcode', { code: '4000417025005' });
+  check('barcode: Marke + Name', code.body.found === true && code.body.name === 'Milka Alpenmilch Schokolade', code.body);
+  const noCode = await app('POST', '/api/dopa/barcode', { code: '1234567890123' });
+  check('barcode: unbekannt → found false', noCode.body.found === false, noCode.body);
+  const badCode = await app('POST', '/api/dopa/barcode', { code: 'abc' });
+  check('barcode: Unsinn → 400', badCode.status === 400, badCode);
   check('money/scan: Kontostand (auch im Minus) und Kontoname', scan.body.balance === -12.35 && scan.body.account === 'Sparkasse Girokonto', scan.body);
   const tips = await app('POST', '/api/dopa/money/tips', { summary: 'Lieferando 4× 48 €' });
   check('money/tips kommt durch', tips.body.tips?.[0] === 'Lieferando 4×', tips.body);

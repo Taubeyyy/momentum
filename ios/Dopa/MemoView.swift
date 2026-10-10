@@ -346,11 +346,12 @@ private struct PendingPhotoCard: View {
 /// Schlichtes Suchfeld im Dopa-Look.
 struct SearchField: View {
     @Binding var text: String
+    var prompt = "Wo ist mein Schlüssel?"
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundStyle(DS.faint)
-            TextField("", text: $text, prompt: Text("Wo ist mein Schlüssel?").foregroundColor(Color(hex: 0x756D7A)))
+            TextField("", text: $text, prompt: Text(prompt).foregroundColor(Color(hex: 0x756D7A)))
                 .font(.system(size: 15))
                 .foregroundStyle(DS.ink)
                 .submitLabel(.search)

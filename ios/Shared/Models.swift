@@ -463,6 +463,7 @@ struct AppData: Codable {
     var workshop = WorkshopState()                  // Dots Werkstatt (Idle-Spiel)
     var spots: [Spot] = []                          // Orte für Erinnerungen beim Ankommen
     var bank: BankBalance?                          // Kontostand vom letzten Banking-Screenshot
+    var flyers: [Flyer] = []                        // eingelesene Prospekte (abgelaufene fliegen raus)
 }
 
 /// Kontostand, wie er auf dem letzten Screenshot stand (z. B. Sparkasse: die große Zahl oben).
@@ -530,6 +531,7 @@ extension AppData {
         workshop = c.value(.workshop, or: WorkshopState())
         spots = c.value(.spots, or: [])
         bank = c.value(.bank, or: nil)
+        flyers = c.value(.flyers, or: [])
     }
 }
 

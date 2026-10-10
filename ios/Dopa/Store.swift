@@ -383,6 +383,19 @@ final class Store: ObservableObject {
 
     /// „Milch, Brot und Eier“ → drei Einträge; was schon draufsteht, kommt nicht doppelt.
     /// Gang: erst was du/Gemini schon mal festgelegt habt, dann Stichwörter, sonst fragt Gemini.
+    /// Genau ein Artikel (Barcode, Prospekt) – ohne „Milch Brot Eier“-Zerlegen. Doppelt wird nichts.
+    func addShopItem(_ name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = ShopText.key(name)
+        guard !name.isEmpty, !openKeys.contains(key) else { return }
+        var item = ShopItem(name: name)
+        if let learned = data.shopLearned[key] { item.category = learned }
+        data.shopItems.append(item)
+        save()
+        if item.category == .other { Task { await categorizeWithAI([name]) } }
+        Task { await estimatePrices() }
+    }
+
     func addShop(_ input: String) {
         var keys = openKeys
         var unknown: [String] = []
@@ -1584,6 +1597,15 @@ final class Store: ObservableObject {
         case .dotName:
             guard !a.step.isEmpty else { return false }
             renameDot(a.step)
+        case .memoDelete:
+            guard let i = DotChat.match(a.title, in: data.memos.map(\.text)) else { return missing() }
+            deleteMemo(data.memos[i].id)
+        case .chatClear:
+            // erst nach dem Abhaken leeren – sonst verschwindet der Knopf, während er noch gedrückt wird
+            Task { @MainActor in self.clearDotChat() }
+        case .shopClear:
+            data.shopItems.removeAll { $0.boughtAt == nil }
+            save()
         }
         return true
     }
@@ -1612,6 +1634,27 @@ final class Store: ObservableObject {
         }
         updateReminders(s)          // speichert und plant alle Mitteilungen neu
     }
+
+    // MARK: Prospekte
+
+    /// Eingelesenen Prospekt speichern; abgelaufene fliegen bei der Gelegenheit raus.
+    @discardableResult
+    func addFlyer(_ scan: Server.FlyerScan) -> Flyer {
+        let offers: [Offer] = scan.offers.map { Offer(name: $0.name, price: $0.price, unit: $0.unit, note: $0.note) }
+        let flyer = Flyer(store: scan.store, validFrom: Self.scanDate(scan.validFrom),
+                          validTo: Self.scanDate(scan.validTo), offers: offers)
+        data.flyers = Offers.active(data.flyers, now: Date()) + [flyer]
+        save()
+        return flyer
+    }
+
+    func deleteFlyer(_ id: UUID) {
+        data.flyers.removeAll { $0.id == id }
+        save()
+    }
+
+    /// Gültige Prospekte (ohne abgelaufene).
+    var activeFlyers: [Flyer] { Offers.active(data.flyers, now: Date()) }
 
     // MARK: Orte
 
@@ -1940,6 +1983,14 @@ final class Store: ObservableObject {
 
         let shop = shopOpen.prefix(20).map(\.name)
         if !shop.isEmpty { lines.append("Einkaufsliste: " + shop.joined(separator: ", ")) }
+        // Angebote aus eingelesenen Prospekten (gekürzt)
+        var deals: [String] = []
+        for flyer in activeFlyers {
+            for offer in flyer.offers.prefix(25) where deals.count < 40 {
+                deals.append("\(flyer.storeName): \(offer.name)" + (offer.price > 0 ? " \(MoneyMath.euro(offer.price))" : ""))
+            }
+        }
+        if !deals.isEmpty { lines.append("Angebote aus Prospekten: " + deals.joined(separator: "; ")) }
 
         let memos: [String] = data.memos.sorted { $0.createdAt > $1.createdAt }.prefix(15).compactMap { m in
             let text = m.text.trimmingCharacters(in: .whitespacesAndNewlines)

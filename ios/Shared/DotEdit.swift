@@ -35,6 +35,10 @@ enum DotEdit: String, CaseIterable {
     // Look
     case theme = "theme"                        // step = Name der Farbe
     case dotName = "dot.name"                   // step = neuer Name
+    // Löschen auf Wunsch
+    case memoDelete = "memo.delete"             // title = Text der Notiz
+    case chatClear = "chat.clear"               // das Gespräch mit Dot leeren
+    case shopClear = "shop.clear"               // ganze Einkaufsliste leeren
 
     /// Wochentage aus Wörtern: „Mo“, „Montag“, „werktags“, „Wochenende“, „täglich“ → 1 = So … 7 = Sa.
     static func weekdays(_ items: [String]) -> [Int] {
@@ -95,6 +99,9 @@ enum DotEdit: String, CaseIterable {
         case .snooze: return "„Später“ = \(a.minutes) Min"
         case .theme: return "Farbe: \(a.step)"
         case .dotName: return "Dot heißt jetzt \(a.step)"
+        case .memoDelete: return "Notiz löschen · \(a.title)"
+        case .chatClear: return "Unser Gespräch leeren"
+        case .shopClear: return "Einkaufsliste leeren"
         }
     }
 }

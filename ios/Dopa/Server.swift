@@ -141,6 +141,23 @@ final class Server: ObservableObject {
         try await call("/api/dopa/money/scan", method: "POST", body: ImageBody(image: image, known: known))
     }
 
+    // MARK: Einkauf: Prospekte und Barcode
+
+    struct FlyerOffer: Decodable { let name: String; let price: Double; let unit: String; let note: String }
+    struct FlyerScan: Decodable { let store: String; let validFrom: String; let validTo: String; let offers: [FlyerOffer] }
+
+    /// Prospekt-Foto/Screenshot → Angebote mit Preis und Gültigkeit.
+    func flyer(_ image: String) async throws -> FlyerScan {
+        try await call("/api/dopa/flyer", method: "POST", body: ImageBody(image: image))
+    }
+
+    struct Product: Decodable { let found: Bool; let name: String?; let quantity: String? }
+
+    /// Barcode (EAN) → Produktname aus Open Food Facts.
+    func product(barcode: String) async throws -> Product {
+        try await call("/api/dopa/barcode", method: "POST", body: ["code": barcode])
+    }
+
     struct Tips: Decodable { let tips: [String] }
 
     func moneyTips(_ summary: String) async throws -> [String] {

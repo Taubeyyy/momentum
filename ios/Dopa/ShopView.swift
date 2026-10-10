@@ -18,6 +18,10 @@ struct ShopView: View {
     @State private var finishing = false
     @State private var pricing: ShopItem?
     @State private var priceText = ""
+    @State private var choosingFlyer = false      // Prospekt-Foto einlesen
+    @State private var readingFlyer = false
+    @State private var offerQuery = ""
+    @State private var scanningBarcode = false
     @ObservedObject private var router = Router.shared
     @ObservedObject private var server = Server.shared
     @FocusState private var focused: Bool
@@ -78,6 +82,24 @@ struct ShopView: View {
                 .buttonStyle(PressStyle())
                 .accessibilityLabel("Foto vom Zettel oder Kühlschrank")
             }
+            if server.isConnected {
+                Button { scanningBarcode = true } label: {
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(DS.purpleMuted)
+                        .frame(width: 56, height: 56)
+                        .background(DS.field, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(DS.fieldBorder))
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("Barcode scannen")
+            }
+        }
+        .sheet(isPresented: $scanningBarcode) {
+            BarcodeSheet { code in
+                scanningBarcode = false
+                lookup(code)
+            }
         }
         .photoSource(isPresented: $choosingPhoto, title: "Zettel oder Kühlschrank") { photo = PickedImage(image: $0) }
         .sheet(item: $photo) { picked in
@@ -96,10 +118,144 @@ struct ShopView: View {
             .padding(.top, 12)
         }
 
-        // Erst die Liste, dann der Wagen – Vorschläge ruhig darunter
+        // Erst die Liste, dann der Wagen – Angebote und Vorschläge ruhig darunter
         list
         cart
+        offersSection
         suggestions
+    }
+
+    /// Passendes Angebot aus einem gültigen Prospekt für einen Listen-Eintrag.
+    private func dealText(for item: ShopItem) -> String? {
+        let now = Date()
+        return Offers.best(for: item.name, in: store.activeFlyers, now: now).map { Offers.dealText($0, now: now) }
+    }
+
+    // MARK: Prospekte
+
+    @ViewBuilder
+    private var offersSection: some View {
+        let flyers = store.activeFlyers
+        let count = flyers.reduce(0) { $0 + $1.offers.count }
+        SectionHeading(title: "Angebote",
+                       subtitle: flyers.isEmpty ? "Aus deinen Prospekten" : "\(count) Angebote aus \(flyers.count) Prospekt\(flyers.count == 1 ? "" : "en")") {
+            if server.isConnected && server.aiAvailable {
+                MiniAddButton { choosingFlyer = true }
+                    .accessibilityLabel("Prospekt einlesen")
+            }
+        }
+        .photoSource(isPresented: $choosingFlyer, title: "Prospekt (Foto oder Screenshot)") { scanFlyer($0) }
+
+        if readingFlyer {
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("\(store.dotName) liest den Prospekt …").font(.system(size: 13)).foregroundStyle(DS.muted)
+            }
+            .padding(.bottom, 10)
+        }
+
+        if flyers.isEmpty {
+            EmptyState(symbol: "", title: "Noch kein Prospekt",
+                       text: "Plus oben: Prospekt fotografieren oder Screenshot aus der kaufDA-App. Dopa liest Angebote, Preise und bis wann sie gelten – und zeigt sie bei deiner Liste.")
+        } else {
+            SearchField(text: $offerQuery, prompt: "Im Prospekt suchen, z. B. Butter")
+                .padding(.bottom, 8)
+            let query = offerQuery.trimmingCharacters(in: .whitespaces)
+            if query.isEmpty {
+                HairlineList {
+                    ForEach(flyers) { flyer in
+                        HStack(spacing: 12) {
+                            Image(systemName: "newspaper.fill").foregroundStyle(DS.purpleMuted)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(flyer.storeName).font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.ink)
+                                let valid = Offers.validText(flyer, now: Date())
+                                Text("\(flyer.offers.count) Angebote" + (valid.isEmpty ? "" : " · \(valid)"))
+                                    .font(.system(size: 12)).foregroundStyle(DS.muted)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .hairlineRow(minHeight: 56)
+                        .contextMenu {
+                            Button(role: .destructive) { store.deleteFlyer(flyer.id) } label: {
+                                Label("Prospekt löschen", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            } else {
+                let hits = Offers.search(query, in: flyers, now: Date())
+                if hits.isEmpty {
+                    Text("Nichts gefunden – anders schreiben oder weniger Wörter.").font(.system(size: 13)).foregroundStyle(DS.muted)
+                } else {
+                    HairlineList {
+                        ForEach(Array(hits.prefix(30).enumerated()), id: \.offset) { _, hit in
+                            offerRow(hit)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func offerRow(_ hit: (offer: Offer, flyer: Flyer)) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(hit.offer.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.ink).lineLimit(2)
+                let extra: String = [hit.offer.unit, hit.offer.note].filter { !$0.isEmpty }.joined(separator: " · ")
+                let valid = Offers.validText(hit.flyer, now: Date())
+                Text(hit.flyer.storeName + (extra.isEmpty ? "" : " · \(extra)") + (valid.isEmpty ? "" : " · \(valid)"))
+                    .font(.system(size: 12)).foregroundStyle(DS.muted).lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            if hit.offer.price > 0 {
+                Text(MoneyMath.euro(hit.offer.price))
+                    .font(.system(size: 15, weight: .bold)).monospacedDigit()
+                    .foregroundStyle(Color(hex: 0x4ADE80))
+            }
+            MiniAddButton {
+                store.addShopItem(hit.offer.name)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                Toaster.shared.show("\(hit.offer.name) steht auf der Liste")
+            }
+            .accessibilityLabel("Auf die Einkaufsliste")
+        }
+        .padding(.vertical, 8)
+        .hairlineRow(minHeight: 60)
+    }
+
+    private func scanFlyer(_ image: UIImage) {
+        guard let encoded = MediaUpload.jpegBase64(image, maxSide: 2000, quality: 0.75) else { return }
+        readingFlyer = true
+        Task {
+            do {
+                let scan = try await server.flyer(encoded)
+                if scan.offers.isEmpty {
+                    Toaster.shared.show("Keine Angebote erkannt – schärferes Foto?")
+                } else {
+                    let flyer = store.addFlyer(scan)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    Toaster.shared.show("\(flyer.storeName): \(flyer.offers.count) Angebote")
+                }
+            } catch {
+                Toaster.shared.show("Prospekt ließ sich gerade nicht lesen")
+            }
+            readingFlyer = false
+        }
+    }
+
+    /// Barcode → Produkt (Open Food Facts) → auf die Liste. Unbekannt: Eingabefeld zum Tippen.
+    private func lookup(_ code: String) {
+        Task {
+            let product = try? await server.product(barcode: code)
+            if let product, product.found, let name = product.name, !name.isEmpty {
+                store.addShopItem(name)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                Toaster.shared.show("\(name) steht auf der Liste")
+            } else {
+                Toaster.shared.show("Produkt nicht gefunden – kurz eintippen")
+                focused = true
+            }
+        }
     }
 
     @ViewBuilder
@@ -186,7 +342,8 @@ struct ShopView: View {
                                 .foregroundStyle(DS.faint)
                             HairlineList {
                                 ForEach(items) { item in
-                                    ShopLine(item: item, done: checking.contains(item.id), price: store.shopPrice(item)) { toggle(item) }
+                                    ShopLine(item: item, done: checking.contains(item.id), price: store.shopPrice(item),
+                                             deal: dealText(for: item)) { toggle(item) }
                                         .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity),
                                                                 removal: .opacity))
                                         .contextMenu {
@@ -365,17 +522,26 @@ struct ShopLine: View {
     let item: ShopItem
     let done: Bool
     var price: Double?
+    var deal: String?               // „Lidl 0,99 € · bis Sa“ – passendes Angebot aus einem Prospekt
     let onToggle: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 13) {
                 CheckBox(done: done)
-                Text(item.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .strikethrough(done)
-                    .foregroundStyle(DS.ink)
-                    .animation(.easeOut(duration: 0.2), value: done)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .strikethrough(done)
+                        .foregroundStyle(DS.ink)
+                        .animation(.easeOut(duration: 0.2), value: done)
+                    if let deal, !done {
+                        Label(deal, systemImage: "tag.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0x4ADE80))
+                            .lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 0)
                 if let price {
                     Text("~\(MoneyMath.euro(price))")

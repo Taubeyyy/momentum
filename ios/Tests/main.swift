@@ -58,6 +58,26 @@ expect(DotAction(kind: .edit, title: "", items: ["Mo", "Di", "Do"], key: "mornin
        "Morgen-Check Mo, Di, Do", "Morgen-Tage")
 expect(DotAction(kind: .edit, title: "", step: "Grün", key: "theme").label, "Farbe: Grün", "Farbe")
 expect(DotAction(kind: .edit, title: "x", key: "quatsch").label, "Einstellung ändern", "unbekannt")
+expect(DotAction(kind: .edit, title: "", key: "chat.clear").label, "Unser Gespräch leeren", "Chat leeren")
+expect(DotAction(kind: .edit, title: "Herd ist aus", key: "memo.delete").label, "Notiz löschen · Herd ist aus", "Notiz löschen")
+
+// Prospekte: Gültigkeit, Suche, Angebot zur Einkaufsliste
+let fNow = day(2026, 10, 10, 12)                                    // Samstag
+let lidl = Flyer(store: "Lidl", validFrom: day(2026, 10, 6), validTo: day(2026, 10, 11),
+                 offers: [Offer(name: "Milka Alpenmilch Schokolade", price: 0.99, unit: "100 g"),
+                          Offer(name: "Weidemilch 1,5 %", price: 0.89, unit: "1 l"), Offer(name: "Butter", price: 1.59)])
+let rewe = Flyer(store: "Rewe", validFrom: day(2026, 10, 13), validTo: day(2026, 10, 18),
+                 offers: [Offer(name: "Frische Milch", price: 0.79)])
+let oldAldi = Flyer(store: "Aldi", validTo: day(2026, 10, 4), offers: [Offer(name: "Milch", price: 0.5)])
+expect(Offers.active([lidl, rewe, oldAldi], now: fNow).map(\.store), ["Lidl", "Rewe"], "abgelaufen fliegt raus")
+expect(Offers.isUpcoming(rewe, now: fNow), true, "Rewe gilt erst ab Dienstag")
+expect(Offers.validText(rewe, now: fNow), "ab Di 13.10. · bis So 18.10.", "Gültigkeit als Text")
+expect(Offers.search("milch", in: [lidl, rewe, oldAldi], now: fNow).map { $0.offer.price }, [0.79, 0.89, 0.99], "Suche, günstigste zuerst")
+expect(Offers.best(for: "2x Butter", in: [lidl], now: fNow)?.offer.price, 1.59, "Angebot zur Einkaufsliste")
+expect(Offers.best(for: "Zahnpasta", in: [lidl], now: fNow) == nil, true, "kein Angebot")
+let noDate = Flyer(store: "", added: day(2026, 10, 1), offers: [])
+expect(Offers.isActive(noDate, now: fNow), true, "ohne Datum 10 Tage gültig")
+expect(Offers.isActive(noDate, now: day(2026, 10, 12)), false, "danach weg")
 
 // Kontostand vom Screenshot
 let oldData = try! JSONDecoder().decode(AppData.self, from: #"{"tasks":[]}"#.data(using: .utf8)!)

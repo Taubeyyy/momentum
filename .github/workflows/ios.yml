@@ -30,7 +30,7 @@ jobs:
       - name: Logik-Tests (Erkennungsregeln)
         run: |
           set -o pipefail
-          { swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Timing.swift Shared/Sleep.swift Shared/Workshop.swift Dopa/Game.swift Tests/main.swift -o /tmp/logic && /tmp/logic; } 2>&1 | tee "$RUNNER_TEMP/build.log"
+          { swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Shared/Workshop.swift Dopa/Game.swift Tests/main.swift -o /tmp/logic && /tmp/logic; } 2>&1 | tee "$RUNNER_TEMP/build.log"
 
       - name: Xcode-Projekt erzeugen
         run: xcodegen generate
