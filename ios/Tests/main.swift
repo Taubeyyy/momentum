@@ -1,7 +1,7 @@
 import Foundation
 
 // Logik-Tests für die Regeln ohne KI. Laufen im CI vor dem Build:
-//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/Timing.swift Shared/Sleep.swift Shared/Workshop.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
+//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
 
 var failures = 0
 
@@ -420,60 +420,6 @@ expect(shortDeep.note(.deep), "etwas weniger als üblich", "wenig Tiefschlaf")
 expect(SleepStage(healthValue: 0) == nil, true, "im Bett zählt nicht")
 expect(SleepStage(healthValue: 5), .rem, "REM")
 expect(SleepNight.build([]) == nil, true, "keine Nacht ohne Daten")
-
-// Dots Werkstatt
-let w0 = day(2026, 10, 3, 12)
-var shop = WorkshopState()
-shop.parts = 2
-let wheel = Machine.all[0]
-expect(Workshop.canUpgrade(shop, wheel), true, "Funkenrad mit 2 Bauteilen baubar")
-expect(Workshop.isVisible(shop, Machine.all[1]), false, "Lampe erst später sichtbar")
-shop = Workshop.upgrade(shop, wheel, now: w0)!
-expect(shop.level(wheel), 1, "Funkenrad Stufe 1")
-expect(shop.parts, 0, "Bauteile verbraucht")
-expect(Workshop.pending(shop, now: w0.addingTimeInterval(2 * 3600)), 12, "2 Std × 6 Funken")
-expect(Workshop.pending(shop, now: w0.addingTimeInterval(100 * 3600)), 288.0, "Vorrat voll nach 48 Std, nichts weg")
-expect(Workshop.isFull(shop, now: w0.addingTimeInterval(49 * 3600)), true, "Werkstatt voll")
-shop = Workshop.collect(shop, now: w0.addingTimeInterval(2 * 3600))
-expect(shop.sparks, 12, "eingesammelt")
-expect(Workshop.missingText(shop, wheel), "Noch 4 Bauteile – z. B. eine Aufgabe erledigen.", "was fehlt")
-expect(Workshop.parts(forXP: 25), 2, "Bauteile aus XP")
-expect(Workshop.parts(forXP: 3), 1, "mindestens ein Bauteil")
-// Werkstatt: Ausbau, Hüte, Kiste, Titel
-var ws2 = WorkshopState()
-ws2.levels = ["wheel": 2]
-ws2.lastCollect = w0
-ws2.tools = 2
-expect(Workshop.production(ws2), 12 * 1.3, "Werkzeuge geben Bonus")
-ws2.storage = 1
-expect(Workshop.storageHours(ws2), 72, "größeres Lager")
-expect(Workshop.fill(ws2, now: w0.addingTimeInterval(36 * 3600)), 0.5, "Lager halb voll")
-ws2.sparks = 100
-expect(Workshop.buy(ws2, Hat.all[1]) == nil, true, "Stern zu teuer")
-let dressed = Workshop.buy(ws2, Hat.all[0])!
-expect(dressed.hat, "flower", "Hut sitzt gleich")
-expect(dressed.sparks, 20, "Hut bezahlt")
-expect(Workshop.crateReady(ws2, today: "2026-10-04"), true, "Kiste wartet")
-let opened = Workshop.openCrate(ws2, today: "2026-10-04", roll: 0.2)!
-expect(opened.state.crateDay, "2026-10-04", "Kiste heute offen")
-expect(Workshop.crateReady(opened.state, today: "2026-10-04"), false, "nur eine Kiste am Tag")
-expect(Workshop.title(ws2), "Lehrling", "Titel am Anfang")
-ws2.totalSparks = 7000
-expect(Workshop.title(ws2), "Erfinder", "Titel wächst")
-expect(WorkshopUpgrade.storage.effect(2), "Vorrat 96 Std", "Lager-Text")
-var ws3 = WorkshopState()
-ws3.sparks = 600
-expect(ws3.currentRoom.id, "night", "Nachtwerkstatt als Start")
-expect(Workshop.enter(ws3, Room.all[2]) == nil, true, "Waldhütte zu teuer")
-let dawn = Workshop.enter(ws3, Room.all[1])!
-expect(dawn.room, "dawn", "eingezogen")
-expect(dawn.sparks, 100, "Raum bezahlt")
-let back = Workshop.enter(dawn, Room.all[1])!
-expect(back.sparks, 100, "gekaufter Raum kostet nichts mehr")
-expect(Workshop.dotLine(WorkshopState(), now: w0, tick: 3), "Ein Funkenrad wär schön. Eine Aufgabe reicht dafür.", "Dot am Anfang")
-expect(Machine.all.count, 6, "sechs Maschinen")
-let oldShop = try! JSONDecoder().decode(WorkshopState.self, from: #"{"parts":3}"#.data(using: .utf8)!)
-expect(oldShop.parts, 3, "Werkstatt tolerant gelesen")
 
 // Aufgaben mit Uhrzeit, Mini-Schritt auf Wunsch
 expect(Timing.moveTime(day(2026, 10, 3, 14, 30), to: day(2026, 10, 5, 0)), day(2026, 10, 5, 14, 30), "Uhrzeit wandert mit dem Tag")

@@ -461,7 +461,6 @@ struct AppData: Codable {
     var payments: [Payment] = []
     var calendar = CalendarSettings()
     var dotChat: [DotMessage] = []                  // Gespräch mit Dot (gekürzt auf DotChat.keep)
-    var workshop = WorkshopState()                  // Dots Werkstatt (Idle-Spiel)
     var spots: [Spot] = []                          // Orte für Erinnerungen beim Ankommen
     var bank: BankBalance?                          // Kontostand vom letzten Banking-Screenshot
     var flyers: [Flyer] = []                        // eingelesene Prospekte (abgelaufene fliegen raus)
@@ -530,7 +529,6 @@ extension AppData {
         payments = c.value(.payments, or: [])
         calendar = c.value(.calendar, or: CalendarSettings())
         dotChat = c.value(.dotChat, or: [])
-        workshop = c.value(.workshop, or: WorkshopState())
         spots = c.value(.spots, or: [])
         bank = c.value(.bank, or: nil)
         flyers = c.value(.flyers, or: [])

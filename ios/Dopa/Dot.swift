@@ -27,9 +27,10 @@ enum DotStage: Int {
     }
 }
 
-/// Was Dot gerade für ein Gesicht macht. `auto` folgt dem Check-in.
+/// Was Dot gerade für ein Gesicht macht. `auto` folgt dem Check-in – und wird von selbst
+/// `focused`, solange ein Timer läuft, und `sleepy` mitten in der Nacht.
 enum DotExpression {
-    case auto, thinking, listening, happy
+    case auto, thinking, listening, happy, focused, sleepy
 }
 
 /// Dot als Figur: leuchtende Kugel in der Themenfarbe mit Gesicht – blinzelt, schaut umher,
@@ -49,6 +50,9 @@ struct DotView: View {
     @State private var lookX: CGFloat = 0
     @State private var hop = false
     @State private var joy = false
+    @State private var wiggle = false
+    @State private var wink = false
+    @State private var taps = 0
     @State private var burstAt: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -58,9 +62,31 @@ struct DotView: View {
     private var moving: Bool { animated && !reduceMotion }
     private var thinking: Bool { expression == .thinking }
     private var happy: Bool { joy || expression == .happy }
+    /// Großer Dot (Gespräch, Profil): mit Bodenschatten und leichtem Schweben.
+    private var grand: Bool { size >= 60 }
+
+    /// `auto` aufgelöst: Timer läuft → konzentriert, zwischen 0 und 5 Uhr → müde.
+    private var look: DotExpression {
+        guard expression == .auto else { return expression }
+        if let run = store.data.focus, run.endsAt > Date() { return .focused }
+        if Calendar.current.component(.hour, from: Date()) < 5 { return .sleepy }
+        return .auto
+    }
 
     var body: some View {
         ZStack {
+            // Bodenschatten: wird kleiner und blasser, wenn Dot hochhüpft oder schwebt
+            if grand {
+                Ellipse()
+                    .fill(Color.black.opacity(hop ? 0.18 : 0.32))
+                    .frame(width: orb * 0.62, height: orb * 0.12)
+                    .blur(radius: size * 0.02)
+                    .scaleEffect(hop ? 0.7 : (breathe ? 0.9 : 1))
+                    .offset(y: orb * 0.62)
+                    .animation(moving ? .easeInOut(duration: 2.6).repeatForever(autoreverses: true) : nil, value: breathe)
+                    .animation(.spring(response: 0.26, dampingFraction: 0.45), value: hop)
+            }
+
             // weicher Schein
             Circle()
                 .fill(accent.opacity(0.3))
@@ -91,6 +117,9 @@ struct DotView: View {
             if let burstAt {
                 DotBurst(start: burstAt, size: size, color: accent)
             }
+            if look == .sleepy && moving && size >= 40 {
+                DotSleepZ(size: size)
+            }
 
             // Körper (Arme dahinter, Sprössling obendrauf)
             ZStack {
@@ -104,13 +133,24 @@ struct DotView: View {
                     .rotationEffect(.degrees(-24))
                     .offset(x: -orb * 0.17, y: -orb * 0.25)
                     .blur(radius: orb * 0.02)
+                // feiner Lichtrand oben – wirkt runder, ohne laut zu sein
+                if size >= 30 {
+                    Circle()
+                        .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.32), Color.white.opacity(0)],
+                                                     startPoint: .top, endPoint: .center),
+                                      lineWidth: max(0.8, orb * 0.022))
+                }
                 if size >= 22 { face }
                 if size >= 22 && level >= 3 { sprout }
             }
             .frame(width: orb, height: orb)
             .shadow(color: accent.opacity(0.55), radius: size * 0.07)
             .scaleEffect(breathe ? 1.03 : 0.98)
+            .offset(y: grand ? (breathe ? -size * 0.025 : size * 0.01) : 0)
             .animation(moving ? .easeInOut(duration: 2.6).repeatForever(autoreverses: true) : nil, value: breathe)
+            // Wackeln (zweites Antippen)
+            .rotationEffect(.degrees(wiggle ? 9 : 0), anchor: .bottom)
+            .animation(.spring(response: 0.18, dampingFraction: 0.25), value: wiggle)
             // Hüpfer: kurz strecken und hoch, dann federnd zurück
             .scaleEffect(x: hop ? 0.92 : 1, y: hop ? 1.08 : 1, anchor: .bottom)
             .offset(y: hop ? -size * 0.1 : 0)
@@ -119,7 +159,7 @@ struct DotView: View {
         .frame(width: size, height: size)
         .contentShape(Circle())
         .simultaneousGesture(TapGesture().onEnded {
-            cheer(burst: true)
+            react()
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         }, including: tappable ? GestureMask.all : GestureMask.none)
         .onAppear {
@@ -161,6 +201,28 @@ struct DotView: View {
             burstAt = nil
             try? await Task.sleep(nanoseconds: 800_000_000)
             joy = false
+        }
+    }
+
+    /// Antippen: abwechselnd hüpfen (mit Funken), wackeln, zwinkern – damit es sich nicht abnutzt.
+    private func react() {
+        guard !reduceMotion, size >= 20 else { return }
+        taps += 1
+        switch taps % 3 {
+        case 1:
+            cheer(burst: true)
+        case 2:
+            wiggle = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 140_000_000)
+                wiggle = false
+            }
+        default:
+            wink = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                wink = false
+            }
         }
     }
 
@@ -209,11 +271,14 @@ struct DotView: View {
     private var face: some View {
         let mood = store.todayCheckIn?.mood ?? 4
         let ink = Color(hex: 0x1B1226)
+        let current: DotExpression = look
+        let sleepy = current == .sleepy && !happy
+        let focused = current == .focused && !happy
         let moodCurve: CGFloat = mood >= 4 ? 1 : mood == 3 ? 0.45 : 0.12
-        let curve: CGFloat = happy ? 1.25 : thinking ? 0.15 : moodCurve
+        let curve: CGFloat = happy || wink ? 1.25 : thinking ? 0.15 : sleepy ? 0.25 : focused ? 0.35 : moodCurve
         let eyeX: CGFloat = thinking ? orb * 0.07 : lookX * orb
-        let eyeY: CGFloat = thinking ? -orb * 0.1 : expression == .listening ? -orb * 0.03 : -orb * 0.05
-        let eyeScale: CGFloat = blink ? 0.12 : (expression == .listening ? 1.15 : 1)
+        let eyeY: CGFloat = thinking ? -orb * 0.1 : current == .listening || focused ? -orb * 0.03 : -orb * 0.05
+        let eyeScale: CGFloat = blink ? 0.12 : (current == .listening ? 1.15 : focused ? 0.72 : 1)
         let stroke = StrokeStyle(lineWidth: max(1, orb * 0.045), lineCap: .round)
         return ZStack {
             if happy {
@@ -231,10 +296,22 @@ struct DotView: View {
                 }
                 .offset(y: orb * 0.06)
                 .transition(.opacity)
+            } else if sleepy {
+                // Augen zu: zwei sanfte Bögen
+                HStack(spacing: orb * 0.15) {
+                    DotMouth(curve: 0.9).stroke(ink, style: stroke)
+                        .frame(width: orb * 0.13, height: orb * 0.05)
+                    DotMouth(curve: 0.9).stroke(ink, style: stroke)
+                        .frame(width: orb * 0.13, height: orb * 0.05)
+                }
+                .offset(y: -orb * 0.03)
+                .transition(.opacity)
             } else {
                 HStack(spacing: orb * 0.17) {
-                    Capsule().fill(ink).frame(width: orb * 0.11, height: orb * 0.17)
-                    Capsule().fill(ink).frame(width: orb * 0.11, height: orb * 0.17)
+                    eye(ink)
+                    eye(ink)
+                        .scaleEffect(x: 1, y: wink ? 0.12 : 1)
+                        .animation(.easeInOut(duration: 0.1), value: wink)
                 }
                 .scaleEffect(x: 1, y: eyeScale)
                 .animation(.easeInOut(duration: 0.08), value: blink)
@@ -245,11 +322,25 @@ struct DotView: View {
             }
             DotMouth(curve: curve)
                 .stroke(ink, style: stroke)
-                .frame(width: orb * (happy ? 0.3 : 0.24), height: orb * 0.09)
+                .frame(width: orb * (happy ? 0.3 : sleepy || focused ? 0.18 : 0.24), height: orb * 0.09)
                 .offset(x: thinking ? orb * 0.05 : 0, y: orb * 0.16)
                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: curve)
         }
         .animation(.easeOut(duration: 0.18), value: happy)
+        .animation(.easeInOut(duration: 0.4), value: sleepy)
+    }
+
+    /// Ein Auge mit kleinem Glanzpunkt (erst ab mittlerer Größe – winzig wäre es nur Rauschen).
+    private func eye(_ ink: Color) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Capsule().fill(ink).frame(width: orb * 0.11, height: orb * 0.17)
+            if size >= 40 {
+                Circle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: orb * 0.038, height: orb * 0.038)
+                    .offset(x: -orb * 0.014, y: orb * 0.026)
+            }
+        }
     }
 
     private func satellites(count: Int, radius: CGFloat) -> some View {
@@ -322,6 +413,29 @@ struct DotThinkingRing: View {
                         .fill(color.opacity(1 - Double(i) * 0.3))
                         .frame(width: size * (0.075 - CGFloat(i) * 0.015), height: size * (0.075 - CGFloat(i) * 0.015))
                         .offset(x: CGFloat(cos(-angle)) * size * 0.43, y: CGFloat(sin(-angle)) * size * 0.43)
+                }
+            }
+            .frame(width: size, height: size)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// Mitten in der Nacht: zwei kleine „z“ steigen langsam auf und verblassen. Über die Uhr, nicht repeatForever.
+struct DotSleepZ: View {
+    let size: CGFloat
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: false)) { context in
+            let t: Double = context.date.timeIntervalSinceReferenceDate
+            ZStack {
+                ForEach(0..<2, id: \.self) { i in
+                    let p: Double = (t / 3.4 + Double(i) * 0.5).truncatingRemainder(dividingBy: 1)
+                    Text("z")
+                        .font(.system(size: size * CGFloat(0.11 + 0.06 * p), weight: .bold, design: .rounded))
+                        .foregroundStyle(DS.purpleMuted)
+                        .opacity(sin(p * Double.pi) * 0.8)
+                        .offset(x: size * CGFloat(0.24 + 0.1 * p), y: -size * CGFloat(0.2 + 0.24 * p))
                 }
             }
             .frame(width: size, height: size)

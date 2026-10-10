@@ -45,6 +45,7 @@ app.put('/api/dopa/release', express.raw({ type: '*/*', limit: '9mb' }), (req, r
   fs.mkdirSync(RELEASE_DIR, { recursive: true });
   fs.writeFileSync(path.join(RELEASE_DIR, `${rel.prefix}-${build}.ipa`), req.body);
   fs.writeFileSync(path.join(RELEASE_DIR, rel.latest), JSON.stringify({ build, notes, at: Date.now() }));
+  addHistory(rel, { build, notes, at: Date.now() });
   // nur die letzten drei Builds behalten
   const re = new RegExp('^' + rel.prefix + '-(\\d+)\\.ipa$');
   const old = fs.readdirSync(RELEASE_DIR).map(f => re.exec(f)).filter(Boolean)
@@ -69,6 +70,38 @@ app.put('/api/dopa/ci-log', express.text({ type: '*/*', limit: '2mb' }), (req, r
     .sort((a, b) => Number(b[1]) - Number(a[1]));
   for (const m of logs.slice(10)) fs.rmSync(path.join(RELEASE_DIR, m[0]), { force: true });
   res.json({ ok: true });
+});
+
+/* ---------- Was ist neu (Feedback #47): jeder Build mit seinem Update-Text ---------- */
+const historyFile = rel => path.join(RELEASE_DIR, `${rel.prefix}-history.json`);
+function readHistory(rel) {
+  try { const list = JSON.parse(fs.readFileSync(historyFile(rel), 'utf8')); return Array.isArray(list) ? list : []; } catch { return []; }
+}
+function addHistory(rel, entry) {
+  const list = [entry, ...readHistory(rel).filter(e => e.build !== entry.build)].slice(0, 200);
+  fs.writeFileSync(historyFile(rel), JSON.stringify(list));
+}
+// Startbestand aus den build-N-Markierungen (tools/changelog-seed.tsv: „build-N<Tab>JJJJ-MM-TT<Tab>Text“)
+function seedHistory() {
+  try {
+    return fs.readFileSync(path.join(__dirname, 'tools', 'changelog-seed.tsv'), 'utf8').split('\n').map(line => {
+      const [tag, day, ...text] = line.split('\t');
+      const build = parseInt(String(tag || '').replace('build-', ''), 10);
+      const at = Date.parse(day + 'T12:00:00Z');
+      return Number.isInteger(build) && build > 0 ? { build, notes: text.join(' ').trim(), at: Number.isNaN(at) ? 0 : at } : null;
+    }).filter(Boolean);
+  } catch { return []; }
+}
+function changelog(rel, seed) {
+  const byBuild = new Map();
+  for (const e of [...(seed || []), ...readHistory(rel)]) {
+    if (Number.isInteger(e.build) && e.build > 0 && String(e.notes || '').trim()) byBuild.set(e.build, { build: e.build, notes: String(e.notes).slice(0, 400), at: e.at || 0 });
+  }
+  return [...byBuild.values()].sort((a, b) => b.build - a.build).slice(0, 80);
+}
+app.get('/api/dopa/changelog', (req, res) => {
+  const rel = releaseApp(req.query.app) || releaseApp('dopa');
+  res.json({ builds: changelog(rel, rel.prefix === 'Dopa' ? seedHistory() : []) });
 });
 
 app.get('/api/dopa/latest', (req, res) => {

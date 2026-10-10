@@ -149,10 +149,42 @@ struct DotGreeting: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressStyle())
-            .accessibilityHint("Mit \(store.dotName) reden")
+            .contextMenu { quickMenu }
+            .accessibilityHint("Mit \(store.dotName) reden – lange drücken für Schnellstart")
         } else {
             greeting
+                .contextMenu { timerButton }
         }
+    }
+
+    /// Lange drücken: direkt mit einer Frage ins Gespräch springen oder einen kurzen Timer starten.
+    @ViewBuilder private var quickMenu: some View {
+        Button { ask("Was soll ich jetzt machen? Eine Sache.") } label: {
+            Label("Was jetzt?", systemImage: "sparkles")
+        }
+        Button { ask("Ich komm nicht in die Gänge. Gib mir einen winzigen ersten Schritt.") } label: {
+            Label("Hilf mir anfangen", systemImage: "figure.walk")
+        }
+        Button { ask("Plan mir locker den Rest vom Tag, mit Pausen.") } label: {
+            Label("Rest vom Tag planen", systemImage: "calendar.day.timeline.left")
+        }
+        timerButton
+    }
+
+    @ViewBuilder private var timerButton: some View {
+        if store.data.focus == nil {
+            Button {
+                store.startFocus(taskID: nil, title: "Fokus", step: "", minutes: 10)
+                Toaster.shared.show("10 Minuten laufen – \(store.dotName) passt auf")
+            } label: {
+                Label("10 Minuten Fokus", systemImage: "timer")
+            }
+        }
+    }
+
+    private func ask(_ text: String) {
+        Router.shared.showMore(.dot)
+        Task { await store.sendToDot(text) }
     }
 
     private var greeting: some View {

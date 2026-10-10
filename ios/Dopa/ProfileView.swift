@@ -71,6 +71,9 @@ struct ProfilePage: View {
                                 title: updates.available ? "Update auf Build \(updates.latest?.build ?? 0) installieren" : "Dopa ist aktuell",
                                 value: "Build \(updates.currentBuild)")
                 }
+                NavigationLink { ChangelogPage() } label: {
+                    SettingsRow(icon: "sparkles.rectangle.stack.fill", color: Color(hex: 0x8B5CF6), title: "Was ist neu")
+                }
                 NavigationLink { AccountPage() } label: {
                     SettingsRow(icon: "icloud.fill", color: .blue, title: "Konto & Backup",
                                 value: BackupText.short(server.backupAt, connected: server.isConnected))

@@ -187,6 +187,21 @@ final class Server: ObservableObject {
         try await call("/api/dopa/latest", auth: false)
     }
 
+    struct BuildNote: Decodable, Identifiable {
+        let build: Int
+        let notes: String
+        let at: Double
+        var id: Int { build }
+        var date: Date? { at > 0 ? Date(timeIntervalSince1970: at / 1000) : nil }
+    }
+    struct Changelog: Decodable { let builds: [BuildNote] }
+
+    /// „Was ist neu“: alle Builds mit ihrem Update-Text (ohne Login).
+    func changelog() async throws -> [BuildNote] {
+        let res: Changelog = try await call("/api/dopa/changelog", auth: false)
+        return res.builds
+    }
+
     struct DayLines: Decodable {
         let briefing: String; let midday: String; let afternoon: String; let evening: String; let night: String
         let nudges: [String]; let meals: [String]

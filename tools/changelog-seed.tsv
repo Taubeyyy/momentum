@@ -1,0 +1,69 @@
+build-110	2026-10-10	Prospekt-Links aus kaufDA: in kaufDA teilen und kopieren, in Dopa einfügen – der Prospekt öffnet sich direkt in Dopa, „Seite einlesen“ holt die Angebote, Seiten desselben Prospekts landen zusammen
+build-109	2026-10-10	Einkauf: Preis antippen und selbst eintragen – Dopa merkt sich den Stückpreis und nimmt ihn nächstes Mal statt zu schätzen (auch bei anderer Menge), und neue Schätzungen richten sich nach deinen Preisen
+build-108	2026-10-10	Einkauf: Barcode scannen setzt das Produkt auf die Liste, Prospekte (Foto oder kaufDA-Screenshot) liest Dopa mit Preisen und Gültigkeit – durchsuchbar, und Angebote stehen direkt bei deiner Liste. Dot kann auf Wunsch auch Notizen, unser Gespräch oder die Einkaufsliste löschen
+build-107	2026-10-09	Dot kann jetzt fast die ganze App anpassen: Morgen- und Abendroutine (Zeiten, Tage, Schritte), Essens- und Stupser-Zeiten, Erinnerungen, Gewohnheiten, Aufgaben (umbenennen, verschieben, löschen), Einkaufsliste, Timer-Knöpfe, Farbe und seinen Namen – alles erst nach deinem Tipp
+build-106	2026-10-09	Dot ist schlauer: versteht, was du willst, plant Pausen als Pausen, reagiert auf Ärger ohne Sprüche und kann die App einstellen (z. B. „diese Woche kein Morgen-Check“). Und der Bank-Screenshot liest jetzt deinen Kontostand mit
+build-105	2026-10-05	Merken: Fotos bleiben scharf (viel höhere Auflösung), und Aufträge – z. B. von einer Lehrkraft – erkennt Dopa jetzt und schlägt sie gleich als Aufgabe mit Frist vor, getippt oder vom Foto
+build-104	2026-10-04	Claude-App: neueste Fakester- und Dopa-Version direkt im Projekt installieren
+build-103	2026-10-04	Neue Claude-App für dich: Dopa und Fakester an einem Ort – Feedback antippen, Claude setzt um, du liest live mit. Der Claude-Tab in Dopa ist dafür raus.
+build-66	2026-10-04	Dot sieht Fotos: schick ihm deinen Seminar-Wochenplan und er trägt alle Termine mit Uhrzeit in deinen Plan ein, oder eine Packliste und er macht Schritte daraus – alles erst nach deinem Tipp
+build-64	2026-10-04	Dot passt deine Aufgaben an: er hängt Schritte an bestehende Aufgaben (z. B. was in den Koffer muss), legt Reste für morgen mit Uhrzeit an und kennt dafür deine Aufsteh-, Losgeh- und Bettzeiten – alles erst nach deinem Tipp
+build-63	2026-10-04	Leiste unten für eine Hand: Daumen über die Leiste ziehen wechselt den Tab, die Tabs sind größer, und im Linkshänder-Modus geht die Mehr-Bubble links auf
+build-62	2026-10-04	Werkstatt ist raus – war zu viel. Dein Stand ist gespeichert, falls sie mal zurückkommen soll
+build-61	2026-10-04	Leiser: Heute zeigt weniger Kästen (kein Tipp-Kasten, keine Uhr-Zeile, keine Schlafkarte), Häkchen ohne Ring, Dot hüpft ohne Funkenregen, Profil ohne Doppeltes
+build-60	2026-10-03	Neue Startanimation mit Dot, der reinfällt und mit Funken landet. Werkstatt größer: Wolkenmaschine, 4 neue Hüte, Räume (Morgenrot, Waldhütte, Weltall), Dot redet in der Werkstatt, und beim Einsammeln steigen die Funken auf
+build-59	2026-10-03	Werkstatt in groß: eigener warmer Look mit kleiner Werkstatt-Szene und Funkenregen, Hüte für Dot (trägt er überall), Lager und Werkzeuge ausbauen, eine Überraschungskiste pro Tag und Titel vom Lehrling bis zur Funken-Legende
+build-58	2026-10-03	Neu: Dots Werkstatt (unter Mehr) – fürs Erledigen gibt's Bauteile, damit baust du Maschinen, die von allein Funken sammeln. Nichts geht verloren, ist der Vorrat voll, sagt Dot kurz Bescheid
+build-57	2026-10-03	Großes Aufräumen: neue Leiste (Heute · Machen · Merken · Einkauf · Mehr), Aufgaben und Plan unter einem Dach, Geld, Schlaf, Dot, Claude und Profil in der Mehr-Bubble, Heute ruhiger mit einer Karte statt zwei – und Dot hat jetzt Ärmchen und bekommt ab Level 3 einen Sprössling
+build-56	2026-10-03	Neue Schlaf-Seite: deine letzte Nacht mit Phasen (Tief, REM, Kern, Wach) als Grafik, kurz erklärt, dazu 7 Nächte – morgens auch als kleine Karte in Heute
+build-55	2026-10-03	Dot sieht jetzt Schlaf und Bewegung von deiner Apple Watch und plant danach – nach kurzen Nächten kleinere Schritte, nach viel Sitzen mal eine Pause. In Heute steht's leise unter Dots Satz
+build-53	2026-10-03	Aufgeräumt: Aufgaben mit nur noch „Was jetzt?“, Timer und einem Mehr-Menü, Einkauf zeigt zuerst die Liste, „Als Nächstes“ nur wenn was ansteht, Profil und Technik schlanker
+build-52	2026-10-03	Aufgaben bekommen eine Uhrzeit mit Erinnerung (Erledigt/Später direkt in der Mitteilung, auch auf der Uhr), und der Mini-Schritt steht nur noch da, wenn du ihn willst
+build-51	2026-10-03	Nur Technik: jeder Build durchleuchtet sich jetzt selbst, damit die Live-Activity-Suche schneller geht (für dich ändert sich nichts)
+build-50	2026-10-03	Live Activity: Technik-Seite mit zwei kurzen Tests, die zeigen, ob es an der Widget-Erweiterung oder an TrollStore liegt
+build-49	2026-10-03	Live Activity: Technik-Seite zeigt jetzt, wie du sie reparierst (in TrollStore auf „User“ umstellen) und erkennt im Protokoll, wenn iOS sie sofort wieder schließt
+build-48	2026-10-03	Apple Watch: Losgeh-Countdown tippt dir vor Morgen und Terminen aufs Handgelenk, Timer meldet die Halbzeit, Schlaf von der Uhr macht den Tag nach kurzen Nächten sanfter, Schritte haken Gewohnheiten ab. Dazu eigene Zeiten für Timer-Knöpfe, „+ Min“, Später, Dranbleiben und Countdown
+build-46	2026-10-03	Plan und Geld bewegen sich jetzt auch: Tagesauswahl gleitet, die Zeitleiste baut sich beim Tageswechsel auf, der Jetzt-Punkt pulsiert, Beträge rollen und die Wochenbalken wachsen hoch. Timer-Ende lässt sich direkt von der Apple Watch mit „Fertig“ oder „+5 Min“ beantworten
+build-45	2026-10-03	Überall sauberere Bewegung: Häkchen zeichnen sich mit kleinem Plopp, Zahlen rollen, Knöpfe federn, Listen gleiten, Einkauf rutscht nach dem Abhaken in den Wagen, Timer mit Fortschrittsbalken und Live-Punkt, Tab-Leiste und Check-in reagieren weich
+build-44	2026-10-03	Dot lebt: schaut umher, hört zu, während du tippst, denkt sichtbar nach und hüpft mit Funken, wenn du was schaffst. Der Chat fühlt sich flüssiger an, und Dot kann Aufgaben jetzt auch abhaken oder auf morgen schieben (per Tipp)
+build-42	2026-10-03	Dot ist jetzt ein richtiger Gesprächspartner: merkt sich, worüber ihr redet, kennt deinen Tag (Termine, Aufgaben, Notizen, Einkauf) und trägt Erinnerungen, Aufgaben, Einkauf oder einen Timer mit einem Tipp ein – oben in „Heute“ auf Dots Satz tippen
+build-41	2026-10-03	Claude direkt aus Dopa: Aufträge im Claude-Tab schicken, live mitlesen, stoppen, weiterschreiben
+build-40	2026-10-03	Neuer Tab „Claude“: deine Pro-Limits mit Reset-Zeit und welches Modell Claude auf dem Server nimmt
+build-39	2026-10-03	Claude auf dem Server: Anleitung (CLAUDE.md), Deploy- und CI-Werkzeuge
+build-38	2026-10-03	Dopa: Profil und Schütteln-Feedback gehen wieder auf (robuster), Fotoauswahl ohne .photosPicker
+build-37	2026-10-03	Dopa: Update-Info mit Direkt-Installieren, Simulator-Rundgang im CI
+build-36	2026-10-03	Dopa: Fotos statt Tippen, Screenshot fürs Geld, Gemini hört mit, neuer Dot, Routinen an festen Tagen
+build-35	2026-10-03	Dopa: sauberer nach Edwins ADHS-Typ – echte iOS-Navigation, Heute in Karten, Einstellungen wie iOS
+build-34	2026-10-03	Dopa: Aufgaben frei planen mit Schritten und Minuten, Plan und Aufgaben aufgeräumt
+build-33	2026-10-02	Dopa: Fotos in Notizen, klarere Tab-Namen
+build-32	2026-10-02	Dopa: Live Activity komplett neu gebaut
+build-31	2026-10-02	Dopa: neue Aufteilung mit fünf Tabs + Dot als Tagesbegleiter
+build-30	2026-10-02	Dopa: Auto-Backup nach jeder Änderung, Profil aufgeräumt
+build-29	2026-10-02	Dopa: Einkaufsmodus mit Swipe, Läden mit Gang-Reihenfolge, Preise, Geld-Tagebuch, Routinen flexibel
+build-28	2026-10-02	Dopa: Geld-Überblick, Kalender, Gewohnheiten, Abendroutine + Jetzt neu sortiert
+build-27	2026-10-02	Dopa: Dot (wachsender Assistent), Check-in + Tipp, Worte, Zerlegen mit Schärfegrad
+build-26	2026-10-01	Zweiter Entwurf: Startbildschirm, Bestaetigungs-Toast, nachgiebige Knoepfe, Haekchen-Plopp, Einblenden
+build-25	2026-10-01	Dopa: Smart Dump sortiert selbst ein, Zeitplan mit Erinnerungen, neues Logo
+build-24	2026-10-01	Fix: Section mit Titel und Fusszeile im Erinnerungs-Editor
+build-22	2026-10-01	Audio-Dump: Apples Server-Spracherkennung statt on-device, mit Diktat-Hinweis und Satzzeichen
+build-21	2026-10-01	Dopa: Redesign nach Edwins Entwurf, Spaß-Budget, eigene Erinnerungen, Audio-Dump
+build-20	2026-10-01	Dopa: "Was jetzt?" per Gemini, Einkauf lernt Gänge
+build-19	2026-10-01	Dopa: Server-Anbindung, Feedback an Claude, KI-Vorschläge, Plan aus Text, Backup
+build-18	2026-10-01	Fix: Tastatur schliesst nur noch beim eigenen Wischen; Notiz-Zeiten aktualisieren sich
+build-17	2026-09-30	Dopa: Design-Feinschliff über die ganze App
+build-16	2026-09-30	Dopa Phase 5: Game-Schicht (XP, Level, Wochen-Quests, Farben) und Backup
+build-15	2026-09-30	CI: Logik-Tests fuer Erkennungsregeln; Erdnussbutter/Tomatenmark korrekt einsortiert
+build-14	2026-09-30	Dopa Phase 4: smarte Einkaufsliste mit Kauf-Parkplatz
+build-13	2026-09-30	Dopa Phase 3: Siri/Kurzbefehle, Als-Nächstes- und Morgen-Widget, dunkles Icon
+build-12	2026-09-30	Dopa Phase 2: Wecker von außen, Morgen-Checkliste, App-Icon
+build-11	2026-09-30	Merken: 'hingelegt/gestellt' zaehlt als Ort, nicht als Erledigt
+build-10	2026-09-30	Dopa: Tastatur schließt zuverlässig, weniger Schritte, regelbasiertes Mitdenken
+build-9	2026-09-30	Dopa Phase 1: Jetzt (Aufgaben + Hilf-mir-anfangen + Timer) und Merken
+build-8	2026-09-30	iOS: Versionsnummer enthält die Build-Nummer (0.1.<Build>)
+build-7	2026-09-30	iOS: Fokus-Timer-Widget als Plan B + Build-Nummer in der App
+build-6	2026-09-30	iOS: Team- und Application-Identifier in App und Widget
+build-5	2026-09-30	iOS: Live-Activity-Statusprotokoll + ldid-Signatur-ID = Bundle-ID
+build-4	2026-09-30	iOS: Absturz beim Start behoben, Diagnose nur noch auf Knopfdruck
+build-3	2026-09-30	iOS: Diagnose spricht LSApplicationProxy korrekt als Klassenobjekt an
+build-2	2026-09-30	iOS: App heißt jetzt Dopa + System-Diagnose für Widget/Live Activity
+build-1	2026-09-30	iOS Phase 0: Test-App mit Widget, Live Activity und TrollStore-Build

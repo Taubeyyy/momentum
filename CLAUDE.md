@@ -20,6 +20,7 @@ Edwin schüttelt in der App das Handy oder tippt im Profil auf „Feedback an Cl
 4. Server geändert → `npm test` muss grün sein (Tests stubben die KI, kosten nichts).
 5. Committen und `git push`. **Die Commit-Nachricht ist der Update-Text in der App** („Build N ist da – …“):
    deutsch, kurz, aus Edwins Sicht („Profil geht wieder auf, Einkauf merkt sich den Laden“), keine Dateinamen.
+   Sie landet auch in Profil → „Was ist neu“ (Server merkt sich jeden Build; ältere aus `tools/changelog-seed.tsv`).
 6. Wenn `ios/**` oder `.github/workflows/ios.yml` geändert wurde, baut GitHub Actions die App (~8–15 Min):
    `dopa-ci --wait` (als Hintergrundbefehl oder mit langem Timeout; gibt nach 9 Min auf → nochmal mit der genannten Nummer).
    Fehler stehen mit Auszug in der Ausgabe, ganze Protokolle in `/var/www/momentum/releases/ci-<Lauf>-build.log` / `-ui.log`.
