@@ -1,7 +1,7 @@
 import Foundation
 
 // Logik-Tests für die Regeln ohne KI. Laufen im CI vor dem Build:
-//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
+//   swiftc Shared/Smart.swift Shared/Shop.swift Shared/Models.swift Shared/Money.swift Shared/Companion.swift Shared/DotChat.swift Shared/DotEdit.swift Shared/Offers.swift Shared/Timing.swift Shared/Sleep.swift Shared/NoteVariety.swift Dopa/Game.swift Tests/main.swift -o logic && ./logic
 
 var failures = 0
 
@@ -435,6 +435,32 @@ expect(oldReminders.countdown, [10, 5], "Countdown-Standard")
 expect(oldReminders.mealsOn, false, "alte Einstellung bleibt")
 let oldChat = #"[{"fromDot":true,"text":"hi"}]"#.data(using: .utf8)!
 expect((try? JSONDecoder().decode([DotMessage].self, from: oldChat))?.first?.actions.count, 0, "alte Nachricht lesbar")
+
+// Mitteilungen ohne Abnutzung
+expect(NoteVariety.weeklyCount(slots: 3, fixed: 10), 3, "Essen bekommt Wochentags-Texte")
+expect(NoteVariety.weeklyCount(slots: 10, fixed: 10), 3, "Budget begrenzt")
+expect(NoteVariety.weeklyCount(slots: 4, fixed: 55), 0, "kein Platz, täglich gleich")
+expect(NoteVariety.weeklyCount(slots: 0, fixed: 0), 0, "nichts zu planen")
+struct TestRNG: RandomNumberGenerator {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return state
+    }
+}
+var rng = TestRNG(state: 42)
+let dealt = NoteVariety.deal(["a", "b", "c"], count: 20, using: &rng)
+expect(dealt.count, 20, "genug Texte")
+expect(zip(dealt, dealt.dropFirst()).allSatisfy { $0.0 != $0.1 }, true, "nie zweimal hintereinander gleich")
+expect(Set(dealt.prefix(3)).count, 3, "erst alle, dann wieder von vorn")
+expect(NoteVariety.deal(["x"], count: 3, using: &rng), ["x", "x", "x"], "ein Text reicht auch")
+expect(NoteVariety.deal([], count: 3, using: &rng), [], "leerer Pool")
+let back = NoteVariety.comebackDates(lastActive: day(2026, 10, 10, 9), now: day(2026, 10, 10, 9, 5))
+expect(back, [day(2026, 10, 12, 18, 30), day(2026, 10, 15, 18, 30)], "Stupser nach 2 und 5 Tagen")
+expect(NoteVariety.comebackDates(lastActive: day(2026, 10, 10, 9), now: day(2026, 10, 13, 9)).count, 1, "vergangene fallen weg")
+expect(NoteVariety.isComeback(lastActive: day(2026, 10, 8, 23), now: day(2026, 10, 10, 8)), true, "zwei Tage weg")
+expect(NoteVariety.isComeback(lastActive: day(2026, 10, 9, 23), now: day(2026, 10, 10, 8)), false, "gestern da")
+expect(NoteVariety.isComeback(lastActive: nil, now: day(2026, 10, 10, 8)), false, "erstes Öffnen")
 
 if failures > 0 {
     print("\(failures) Logik-Test(s) fehlgeschlagen")

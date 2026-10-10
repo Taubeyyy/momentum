@@ -3,9 +3,9 @@ import Foundation
 import UserNotifications
 
 /// Der „Wecker von außen“: wiederkehrende lokale Benachrichtigungen.
-/// Jede Uhrzeit ist ein eigener, sich täglich wiederholender Eintrag – läuft also weiter,
-/// auch wenn die App tagelang zu bleibt. Die Texte werden bei jedem Öffnen neu ausgelost,
-/// damit sie sich nicht abnutzen.
+/// Jede Uhrzeit ist ein eigener, sich wiederholender Eintrag – läuft also weiter, auch wenn die App tagelang zu bleibt.
+/// Damit sie sich nicht abnutzen: je Wochentag ein eigener Text (soweit das 64er-Limit reicht, `NoteVariety`),
+/// neu ausgelost bei jedem Öffnen und bei der Hintergrund-Aktualisierung.
 enum Reminders {
     private static let prefix = "rem-"
 
@@ -72,6 +72,18 @@ enum Reminders {
         var spots: [Spot] = []              // Orte
         var spotTasks: [TaskItem] = []      // offene Aufgaben mit Ort
         var shopCount = 0                   // offene Sachen auf der Einkaufsliste
+        var lastActive = Date()             // zuletzt geöffnet – für den Stupser nach einer Pause
+        var nextThing: String?              // eine konkrete offene Sache für diesen Stupser
+    }
+
+    /// Eine Uhrzeit, die jeden Tag kommt. Ist Platz, bekommt sie je Wochentag einen eigenen Text (`texts` hat dann 7).
+    private struct Slot {
+        var id: String
+        var minutes: Int
+        var category: String
+        var title: String
+        var texts: [String]
+        var route: String? = nil
     }
 
     /// Knöpfe in den Mitteilungen (auch auf der Uhr). Snooze- und „+ Min“-Zeiten kommen aus den Einstellungen.
@@ -175,27 +187,37 @@ enum Reminders {
         center.removePendingNotificationRequests(withIdentifiers: old)
 
         var requests: [UNNotificationRequest] = []
+        // Tägliche Uhrzeiten, wichtigste zuerst – sie bekommen am ehesten Wochentags-Texte
+        var slots: [Slot] = []
 
         if settings.mealsOn {
+            let pool = (ctx.script?.meals ?? []) + Texts.meal
             for (i, minutes) in settings.mealTimes.enumerated() {
-                let body = ctx.script?.meals.randomElement() ?? Texts.meal.randomElement()!
-                requests.append(daily("meal-\(i)", at: minutes, category: Category.meal,
-                                      title: Texts.mealTitle(minutes), body: body))
+                slots.append(Slot(id: "meal-\(i)", minutes: minutes, category: Category.meal,
+                                  title: Texts.mealTitle(minutes), texts: NoteVariety.deal(pool, count: 7)))
             }
+        }
+
+        if settings.spendAskOn {
+            slots.append(Slot(id: "spend-ask", minutes: settings.spendAskAt, category: Category.spend,
+                              title: "Heute was ausgegeben?", texts: NoteVariety.deal(Texts.spendAsk, count: 7)))
         }
 
         if settings.nudgeOn {
             // Fenster darf über Mitternacht gehen (z. B. 20:00–1:00)
             let end = settings.nudgeTo > settings.nudgeFrom ? settings.nudgeTo : settings.nudgeTo + 1440
             let every = max(15, settings.nudgeEvery)
-            // Dots Tagestexte zuerst, dann die eingebauten – nie zweimal hintereinander gleich
+            let times: [Int] = Array(stride(from: settings.nudgeFrom + every, through: end, by: every).prefix(30))
+            // Dots Tagestexte zuerst, dann die eingebauten – über alle Stupser und Tage gemischt, nie zweimal hintereinander
             let pool = (ctx.script?.nudges ?? []) + Texts.nudge
-            var shuffled = pool.shuffled()
-            for (i, minutes) in stride(from: settings.nudgeFrom + every, through: end, by: every).enumerated().prefix(30) {
-                if shuffled.isEmpty { shuffled = pool.shuffled() }
-                let text = shuffled.removeLast().replacingOccurrences(of: "{zeit}", with: ClockTime.string(minutes))
-                requests.append(daily("nudge-\(i)", at: minutes, category: Category.nudge,
-                                      title: "Kurz hochschauen", body: text))
+            let dealt = NoteVariety.deal(pool, count: times.count * 7)
+            for (i, minutes) in times.enumerated() {
+                let texts: [String] = dealt.isEmpty ? [] : (0..<7).map { (day: Int) -> String in
+                    dealt[(day * times.count + i) % max(1, dealt.count)]
+                        .replacingOccurrences(of: "{zeit}", with: ClockTime.string(minutes))
+                }
+                slots.append(Slot(id: "nudge-\(i)", minutes: minutes, category: Category.nudge,
+                                  title: Texts.nudgeTitle[i % Texts.nudgeTitle.count], texts: texts))
             }
         }
 
@@ -228,12 +250,7 @@ enum Reminders {
             }
         }
 
-        if settings.spendAskOn {
-            requests.append(daily("spend-ask", at: settings.spendAskAt, category: Category.spend,
-                                  title: "Heute was ausgegeben?",
-                                  body: Texts.spendAsk.randomElement()!))
-        }
-
+        requests += comebackRequests(ctx)
         requests += ctx.companion.map(companionRequest)
         requests += morningCountdown(ctx)
         requests += todoRequests(ctx)
@@ -294,8 +311,44 @@ enum Reminders {
             }
         }
 
+        // Wochentags-Texte nur, soweit das 64er-Limit von iOS es zulässt; der Rest bleibt täglich gleich
+        let weekly = NoteVariety.weeklyCount(slots: slots.count, fixed: requests.count)
+        for (index, slot) in slots.enumerated() {
+            requests += expand(slot, weekly: index < weekly)
+        }
+
         for request in requests {
             try? await center.add(request)
+        }
+    }
+
+    private static func expand(_ slot: Slot, weekly: Bool) -> [UNNotificationRequest] {
+        let fallback = slot.texts.first ?? ""
+        guard weekly else {
+            return [daily(slot.id, at: slot.minutes, category: slot.category, title: slot.title, body: fallback, route: slot.route)]
+        }
+        let m = ((slot.minutes % 1440) + 1440) % 1440
+        return (1...7).map { weekday -> UNNotificationRequest in
+            var components = DateComponents()
+            components.weekday = weekday
+            components.hour = m / 60
+            components.minute = m % 60
+            let body = slot.texts.isEmpty ? fallback : slot.texts[(weekday - 1) % slot.texts.count]
+            return request("\(slot.id)-w\(weekday)", components, category: slot.category,
+                           title: slot.title, body: body, route: slot.route)
+        }
+    }
+
+    /// Nach 2 und 5 Tagen ohne Öffnen ein leiser Satz von Dot – ohne Vorwurf, mit einer kleinen Sache.
+    private static func comebackRequests(_ ctx: Context) -> [UNNotificationRequest] {
+        let dates = NoteVariety.comebackDates(lastActive: ctx.lastActive, now: Date())
+        let texts = NoteVariety.deal(ctx.nextThing == nil ? Texts.comeback : Texts.comebackThing, count: dates.count)
+        guard texts.count == dates.count else { return [] }
+        return dates.indices.map { (i: Int) -> UNNotificationRequest in
+            let body = texts[i].replacingOccurrences(of: "{sache}", with: ctx.nextThing ?? "")
+            return once("comeback-\(i)", at: dates[i], category: Category.nudge,
+                        title: Texts.comebackTitle[i % Texts.comebackTitle.count], body: body,
+                        info: ["route": "heute"])
         }
     }
 
@@ -703,6 +756,19 @@ enum Texts {
         "Essen jetzt = kein Heißhunger um Mitternacht.",
         "Kurzer Essens-Check. Muss nichts Großes sein.",
         "Snack-Zeit. Auch wenn du gerade keinen Hunger merkst.",
+        "Schon was im Magen? Sonst: irgendwas, das ohne Kochen geht.",
+        "Kleine Erinnerung von deinem Bauch. Er ist zu höflich, um selbst zu fragen.",
+        "Eine Hand voll Nüsse zählt auch.",
+        "Brot mit irgendwas drauf. Zwei Minuten, fertig.",
+        "Essen ist auch Konzentration. Kurz tanken?",
+        "Wasser und ein Bissen – dann weiter mit dem, was du gerade machst.",
+    ]
+
+    static let nudgeTitle = [
+        "Kurz hochschauen",
+        "Mini-Pause",
+        "Zwischenstand",
+        "Hey",
     ]
 
     static let nudge = [
@@ -716,6 +782,33 @@ enum Texts {
         "Stupser: Wie lange sitzt du schon? Es ist {zeit}.",
         "Falls du gerade zockst: Alles gut. Nur kurz trinken.",
         "Es ist {zeit}. Passt das noch zu deinem Plan für heute?",
+        "Fenster auf, einmal tief Luft. Dann weiter.",
+        "{zeit}. Wenn du gerade festhängst: aufstehen, Glas Wasser, zurück.",
+        "Kurzer Blick nach oben: Was ist gerade wirklich wichtig?",
+        "Augen 20 Sekunden in die Ferne. Bildschirm wartet.",
+        "Handy weg, kurz strecken – ja, nach dieser Mitteilung.",
+        "{zeit} schon. Brauchst du was? Trinken, Snack, frische Luft?",
+        "Wie läuft's? Egal wie: einmal Schultern kreisen.",
+    ]
+
+    static let comebackTitle = [
+        "Nur ein Hallo",
+        "Kleiner Gruß",
+    ]
+
+    /// Nach ein paar Tagen ohne Öffnen – ohne „du warst lange weg“, nichts aufzuholen.
+    static let comeback = [
+        "Kein Druck. Wenn du magst: eine Sache für heute aussuchen, mehr nicht.",
+        "Alles noch da, nichts ist verloren. Einmal reinschauen reicht.",
+        "Ich hab nichts gezählt. Wenn du magst, fangen wir einfach mit was Kleinem an.",
+        "Kurzer Gruß. Falls dir was im Kopf rumschwirrt: schreib's mir, dann ist es raus.",
+    ]
+
+    static let comebackThing = [
+        "Kein Druck. „{sache}“ wartet noch – fünf Minuten reichen schon.",
+        "Nur eine Sache: „{sache}“. Oder was anderes, du entscheidest.",
+        "Alles noch da. Wenn du magst: „{sache}“, ganz klein angefangen.",
+        "Ich hab nichts gezählt. „{sache}“ wär ein guter, kleiner Start.",
     ]
 
     static let task = [
@@ -740,6 +833,8 @@ enum Texts {
         "Gedrückt halten und reinschreiben: „4,50 Döner“. Fertig.",
         "Ein Satz reicht, z. B. „12 Bahn, 3 Kaffee“. Nichts? Einfach wegwischen.",
         "Kurz fürs Geld-Tagebuch – gedrückt halten und Betrag tippen.",
+        "Was hat heute Geld gekostet? Ein Wort und ein Betrag reichen.",
+        "Kassenzettel in der Tasche? Kurz eintragen, dann weg damit.",
     ]
 
     static let eveningTitle = [

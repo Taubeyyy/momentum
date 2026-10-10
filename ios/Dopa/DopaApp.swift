@@ -44,6 +44,8 @@ struct DopaApp: App {
             await Store.shared.backupNow()
             // Dots neuer Tag kann schon geschrieben werden, bevor du die App öffnest
             await Store.shared.refreshCompanionIfNeeded()
+            // Mitteilungs-Texte neu auslosen – auch wenn du die App gerade nicht öffnest (Feedback #49)
+            await Store.shared.rescheduleRemindersNow()
         }
     }
 
@@ -316,6 +318,7 @@ struct RootView: View {
             case .active:
                 // Termine neu lesen, Texte neu auslosen, Zeiten aktualisieren, wartendes Feedback losschicken
                 Agenda.shared.refresh()
+                store.markActive()
                 store.rescheduleReminders()
                 Task {
                     await Updates.shared.check()

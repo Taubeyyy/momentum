@@ -88,6 +88,12 @@ enum CompanionText {
         "Handy ans Kabel, Licht aus. Der Rest kann bis morgen warten.",
         "Nichts muss mehr passieren heute.",
     ]
+    /// Nach ein paar Tagen Pause – kein „lange nicht gesehen“, nichts aufzuholen.
+    static let welcome = [
+        "Schön, dass du da bist. Nichts aufzuholen – nur das Nächste.",
+        "Hey. Alles noch da, alles in Ordnung. Such dir eine kleine Sache aus.",
+        "Pausen gehören dazu. Wir machen einfach da weiter, wo es leicht ist.",
+    ]
 
     static func line(_ phase: DayPhase, day: String) -> String {
         let pool: [String]

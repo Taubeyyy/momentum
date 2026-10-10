@@ -352,7 +352,41 @@ final class Store: ObservableObject {
     }
 
     func rescheduleReminders() {
-        let context = Reminders.Context(
+        let context = reminderContext()
+        Task { await Reminders.reschedule(context) }
+    }
+
+    /// Im Hintergrund (App-Aktualisierung): Texte neu auslosen, ohne dass du die App öffnest.
+    func rescheduleRemindersNow() async {
+        await Reminders.reschedule(reminderContext())
+    }
+
+    // MARK: Pause ohne Vorwurf (Feedback #50)
+
+    private static let lastActiveKey = "dopa.lastActive"
+    /// Nach 2+ Tagen ohne Öffnen: Dot begrüßt ruhig – gilt bis zum nächsten Öffnen.
+    @Published private(set) var welcomeBack = false
+
+    var lastActive: Date {
+        UserDefaults.standard.object(forKey: Self.lastActiveKey) as? Date ?? Date()
+    }
+
+    /// Beim Öffnen: merken, ob Pause war, dann „jetzt“ speichern.
+    func markActive() {
+        let previous = UserDefaults.standard.object(forKey: Self.lastActiveKey) as? Date
+        welcomeBack = NoteVariety.isComeback(lastActive: previous, now: Date())
+        UserDefaults.standard.set(Date(), forKey: Self.lastActiveKey)
+    }
+
+    /// Eine konkrete, kleine offene Sache für den Stupser nach einer Pause.
+    private var nextThing: String? {
+        let open: [TaskItem] = data.tasks.filter { $0.doneAt == nil }
+        guard let title = (todayTasks.first ?? open.first)?.title, !title.isEmpty else { return nil }
+        return title.count > 40 ? String(title.prefix(38)) + "…" : title
+    }
+
+    private func reminderContext() -> Reminders.Context {
+        Reminders.Context(
             settings: data.reminders,
             morning: data.morning,
             evening: data.evening,
@@ -368,8 +402,9 @@ final class Store: ObservableObject {
             tasks: data.tasks.filter { $0.doneAt == nil && ($0.remindAt ?? .distantPast) > Date() },
             spots: data.spots,
             spotTasks: data.tasks.filter { $0.doneAt == nil && $0.spotID != nil },
-            shopCount: data.shopItems.filter { $0.boughtAt == nil }.count)
-        Task { await Reminders.reschedule(context) }
+            shopCount: data.shopItems.filter { $0.boughtAt == nil }.count,
+            lastActive: lastActive,
+            nextThing: nextThing)
     }
 
     // MARK: Einkauf
@@ -1062,6 +1097,9 @@ final class Store: ObservableObject {
 
     /// Was Dot gerade sagt: heute von Gemini geschrieben, sonst eingebaut.
     func dotLine(_ phase: DayPhase, at date: Date = Date()) -> String {
+        if welcomeBack && phase != .night {
+            return CompanionText.welcome[(Calendar.current.ordinality(of: .day, in: .era, for: date) ?? 0) % CompanionText.welcome.count]
+        }
         let line = todayScript?.line(for: phase, minutes: ClockTime.minutes(of: date)) ?? ""
         return line.isEmpty ? CompanionText.line(phase, day: Quest.dayKey(date)) : line
     }
