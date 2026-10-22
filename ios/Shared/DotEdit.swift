@@ -23,6 +23,7 @@ enum DotEdit: String, CaseIterable {
     case habitAdd = "habit.add"                 // step = Name, time = Erinnerung (optional), minutes = pro Tag
     case habitRemove = "habit.remove"           // title
     case habitTime = "habit.time"               // title, time ("" = ohne Erinnerung)
+    case habitDays = "habit.days"               // title, items: Wochentage („Mo“, „werktags“, „täglich“)
     // Aufgaben & Einkauf
     case taskRename = "task.rename"             // title = alt, step = neu
     case taskDelete = "task.delete"             // title
@@ -37,6 +38,7 @@ enum DotEdit: String, CaseIterable {
     case dotName = "dot.name"                   // step = neuer Name
     // Löschen auf Wunsch
     case memoDelete = "memo.delete"             // title = Text der Notiz
+    case memoClear = "memo.clear"               // alle Notizen (heutige „Gegessen“-Einträge bleiben)
     case chatClear = "chat.clear"               // das Gespräch mit Dot leeren
     case shopClear = "shop.clear"               // ganze Einkaufsliste leeren
 
@@ -84,7 +86,13 @@ enum DotEdit: String, CaseIterable {
             return "Stupser \(window)" + (a.minutes > 0 ? ", alle \(a.minutes) Min" : "")
         case .reminderTime: return "Erinnerung „\(a.title)“ um \(clock)"
         case .reminderDelete: return "Erinnerung löschen · \(a.title)"
-        case .habitAdd: return "Gewohnheit: + \(a.step)" + (a.time.map { " (\(DotChat.clock($0)))" } ?? "")
+        case .habitAdd:
+            let days: [Int] = weekdays(a.items)
+            let when: String = days.isEmpty || days.count == 7 ? "" : " · " + weekdayText(days)
+            return "Gewohnheit: + \(a.step)" + (a.time.map { " (\(DotChat.clock($0)))" } ?? "") + when
+        case .habitDays:
+            let days: [Int] = weekdays(a.items)
+            return "„\(a.title)“ \(days.isEmpty ? "?" : weekdayText(days))"
         case .habitRemove: return "Gewohnheit: − \(a.title)"
         case .habitTime: return a.time == nil ? "„\(a.title)“ ohne Erinnerung" : "„\(a.title)“ um \(clock)"
         case .taskRename: return "„\(a.title)“ → „\(a.step)“"
@@ -100,6 +108,7 @@ enum DotEdit: String, CaseIterable {
         case .theme: return "Farbe: \(a.step)"
         case .dotName: return "Dot heißt jetzt \(a.step)"
         case .memoDelete: return "Notiz löschen · \(a.title)"
+        case .memoClear: return "Alle Notizen löschen"
         case .chatClear: return "Unser Gespräch leeren"
         case .shopClear: return "Einkaufsliste leeren"
         }

@@ -11,7 +11,7 @@ struct HabitStrip: View {
     @State private var dragging: UUID?
 
     var body: some View {
-        if !store.data.habits.isEmpty {
+        if !store.todayHabits.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 if !embedded {
                     HStack {
@@ -25,7 +25,8 @@ struct HabitStrip: View {
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
-                        ForEach(store.data.habits) { habit in
+                        // nur was heute dran ist – an freien Tagen (z. B. Sport nur Mo/Mi/Fr) bleibt die Reihe ruhig
+                        ForEach(store.todayHabits) { habit in
                             HabitChip(habit: habit,
                                       count: store.habitCount(habit.id),
                                       lastTick: store.lastTick(habit.id),
@@ -191,7 +192,8 @@ struct HabitsPage: View {
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             ForEach(week, id: \.self) { day in
-                                dot(store.habitCount(habit.id, on: day), of: habit.perDay, future: day > Date())
+                                dot(store.habitCount(habit.id, on: day), of: habit.perDay, future: day > Date(),
+                                    free: !habit.isScheduled(on: day))
                                     .frame(width: 26)
                             }
                         }
@@ -199,7 +201,7 @@ struct HabitsPage: View {
                 } header: {
                     Text("Diese Woche")
                 } footer: {
-                    Text("Kein Streak, keine roten Tage. Ein verpasster Tag ist einfach ein Tag.")
+                    Text("Kein Streak, keine roten Tage. Ein verpasster Tag ist einfach ein Tag. Freie Tage sind nur ein Strich.")
                 }
                 .dopaRow()
             }
@@ -255,18 +257,26 @@ struct HabitsPage: View {
 
     private func detail(_ habit: Habit) -> String {
         var parts = [habit.perDay == 1 ? "1× am Tag" : "\(habit.perDay)× am Tag"]
+        if !habit.days.isEmpty { parts.append(habit.daysText) }
         if habit.isMed { parts.append("Tablette") }
         if let at = habit.remindAt { parts.append("Erinnerung \(ClockTime.string(at))") }
         return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
-    private func dot(_ count: Int, of target: Int, future: Bool) -> some View {
+    private func dot(_ count: Int, of target: Int, future: Bool, free: Bool) -> some View {
         let fraction = min(1, Double(count) / Double(max(1, target)))
-        Circle()
-            .fill(fraction >= 1 ? store.theme.accent : fraction > 0 ? store.theme.accent.opacity(0.4) : Color(hex: 0x2A2530))
-            .frame(width: 12, height: 12)
-            .opacity(future ? 0.35 : 1)
+        if free && count == 0 {
+            // freier Tag: kein leerer Punkt, der nach „verpasst“ aussieht
+            Capsule()
+                .fill(Color(hex: 0x2A2530))
+                .frame(width: 8, height: 2)
+        } else {
+            Circle()
+                .fill(fraction >= 1 ? store.theme.accent : fraction > 0 ? store.theme.accent.opacity(0.4) : Color(hex: 0x2A2530))
+                .frame(width: 12, height: 12)
+                .opacity(future ? 0.35 : 1)
+        }
     }
 }
 
@@ -282,12 +292,54 @@ struct HabitEditor: View {
 
     private var isNew: Bool { !store.data.habits.contains { $0.id == habit.id } }
 
+    /// Mo–So, Kalender-Wochentage (Sonntag = 1).
+    private static let weekdays: [(day: Int, label: String)] = [
+        (2, "Mo"), (3, "Di"), (4, "Mi"), (5, "Do"), (6, "Fr"), (7, "Sa"), (1, "So"),
+    ]
+
+    private func dayChip(_ day: Int, label: String) -> some View {
+        let on: Bool = habit.days.contains(day)
+        return Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            var days = Set(habit.days)
+            if on { days.remove(day) } else { days.insert(day) }
+            // alle sieben = täglich (leer); so bleibt „täglich“ eindeutig
+            habit.days = days.count == 7 ? [] : days.sorted()
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(on ? Color.white : Color(hex: 0xC5BDCA))
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background(on ? store.theme.accent : DS.field, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .animation(.easeOut(duration: 0.15), value: on)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     TextField("Was? z. B. Wasser, Tabletten, Kurz raus", text: $habit.title)
                     Stepper(habit.perDay == 1 ? "1× am Tag" : "\(habit.perDay)× am Tag", value: $habit.perDay, in: 1...12)
+                }
+                .dopaRow()
+
+                Section {
+                    HStack(spacing: 6) {
+                        ForEach(Self.weekdays, id: \.day) { entry in
+                            dayChip(entry.day, label: entry.label)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("An welchen Tagen")
+                } footer: {
+                    Text(habit.days.isEmpty
+                         ? "Nichts gewählt = jeden Tag."
+                         : "Nur \(habit.daysText). An den anderen Tagen taucht es nicht auf und erinnert nicht.")
                 }
                 .dopaRow()
 

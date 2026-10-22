@@ -106,7 +106,10 @@ ai.dotChat = async ({ name, context, history, message, media }) => ({
   data: {
     answer: media ? `Foto gesehen (${media[0].mime})`
       : `${name}: ${history.length} vorher, ${context.includes('Steuer') ? 'Steuer gesehen' : '?'}, ${message}`,
-    actions: message.includes('Morgen-Check') ? [
+    actions: message.includes('alle Notizen') ? [
+      { kind: 'edit', key: 'memo.clear', title: '', step: '', time: '', day: 0, minutes: 0 },
+      { kind: 'edit', key: 'habit.days', title: 'Sport', step: '', time: '', day: 0, minutes: 0, items: ['Mo', 'Mi', 'Fr'] }
+    ] : message.includes('Morgen-Check') ? [
       { kind: 'setting', title: 'morning', step: 'off', time: '', day: 3, minutes: 0 },
       { kind: 'setting', title: 'quatsch', step: 'off', time: '', day: 0, minutes: 0 },
       { kind: 'setting', title: 'nudges', step: 'vielleicht', time: '', day: 0, minutes: 0 },
@@ -447,6 +450,10 @@ function check(name, cond, extra) {
   const edits = (settingChat.body.actions || []).filter(a => a.kind === 'edit');
   check('Dot-Chat: Anpassung durch (auch ohne title), unbekannter Schlüssel fliegt raus',
     edits.length === 1 && edits[0].key === 'morning.leave' && edits[0].time === '07:45', settingChat.body.actions);
+  const clearChat = await app('POST', '/api/dopa/chat', { message: 'lösch alle Notizen, und Sport nur Mo Mi Fr', history: [] });
+  const clearKeys = (clearChat.body.actions || []).map(a => a.key);
+  check('Dot-Chat: alle Notizen löschen und Gewohnheits-Tage kommen durch',
+    clearKeys.join(',') === 'memo.clear,habit.days' && clearChat.body.actions[1].items.join(',') === 'Mo,Mi,Fr', clearChat.body.actions);
   check('Dot-Chat: Werte begrenzt', chat.body.actions?.[1]?.day === 13 && chat.body.actions[1].minutes === 90, chat.body.actions);
   check('Dot-Chat: höchstens 3 Antworten zum Antippen', chat.body.suggestions?.length === 3 && !chat.body.suggestions.includes(''), chat.body.suggestions);
   const photoChat = await app('POST', '/api/dopa/chat', {

@@ -212,6 +212,15 @@ struct Habit: Codable, Identifiable, Hashable {
     var isMed = false                   // Tabletten: Uhrzeit sichtbar, Schutz vor doppelt eintragen
     var remindAt: Int?                  // Erinnerung (Minuten seit Mitternacht), nil = keine
     var stepGoal: Int?                  // hakt sich selbst ab, sobald die Uhr so viele Schritte zählt
+    var days: [Int] = []                // Wochentage (Sonntag = 1); leer = jeden Tag
+
+    /// Gilt die Gewohnheit an diesem Tag? An freien Tagen taucht sie nirgends auf – und zählt nicht als „verpasst“.
+    func isScheduled(on date: Date, calendar: Calendar = .current) -> Bool {
+        days.isEmpty || days.contains(calendar.component(.weekday, from: date))
+    }
+
+    /// „täglich“ / „Mo, Mi, Fr“
+    var daysText: String { days.isEmpty || Set(days) == Set(1...7) ? "täglich" : DotEdit.weekdayText(days) }
 
     static let defaults = [
         Habit(title: "Wasser", symbol: "drop", perDay: 6),
@@ -584,6 +593,7 @@ extension Habit {
         isMed = c.value(.isMed, or: false)
         remindAt = c.value(.remindAt, or: nil)
         stepGoal = c.value(.stepGoal, or: nil)
+        days = c.value(.days, or: [Int]()).filter { (1...7).contains($0) }
     }
 }
 

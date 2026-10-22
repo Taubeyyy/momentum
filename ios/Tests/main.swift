@@ -57,6 +57,11 @@ expect(DotAction(kind: .edit, title: "Mails", step: "Mails beantworten", key: "t
 expect(DotAction(kind: .edit, title: "", items: ["Mo", "Di", "Do"], key: "morning.days").label,
        "Morgen-Check Mo, Di, Do", "Morgen-Tage")
 expect(DotAction(kind: .edit, title: "", step: "Grün", key: "theme").label, "Farbe: Grün", "Farbe")
+expect(DotAction(kind: .edit, title: "", key: "memo.clear").label, "Alle Notizen löschen", "alle Notizen löschen")
+expect(DotAction(kind: .edit, title: "Sport", items: ["Mo", "Mi", "Fr"], key: "habit.days").label,
+       "„Sport“ Mo, Mi, Fr", "Gewohnheit nur an Tagen")
+expect(DotAction(kind: .edit, title: "", step: "Sport", items: ["werktags"], key: "habit.add").label,
+       "Gewohnheit: + Sport · Mo–Fr", "neue Gewohnheit mit Tagen")
 expect(DotAction(kind: .edit, title: "x", key: "quatsch").label, "Einstellung ändern", "unbekannt")
 expect(DotAction(kind: .edit, title: "", key: "chat.clear").label, "Unser Gespräch leeren", "Chat leeren")
 expect(DotAction(kind: .edit, title: "Herd ist aus", key: "memo.delete").label, "Notiz löschen · Herd ist aus", "Notiz löschen")
@@ -507,6 +512,19 @@ expect(Surprise.kind(roll: 0), .confetti, "Art vorne")
 expect(Surprise.kind(roll: 0.99), .spin, "Art hinten")
 expect(Surprise.text(.joke, n: 0) != Surprise.text(.joke, n: 1), true, "Witze reihum")
 expect(Surprise.text(.fact, n: Surprise.facts.count), Surprise.text(.fact, n: 0), "nach allen von vorn")
+
+// Gewohnheiten nur an bestimmten Tagen (19.10.2026 = Montag)
+let sport = Habit(title: "Sport", symbol: "bolt", days: [2, 4, 6])
+expect(sport.isScheduled(on: day(2026, 10, 19)), true, "Montag ist Sport-Tag")
+expect(sport.isScheduled(on: day(2026, 10, 20)), false, "Dienstag frei")
+expect(sport.daysText, "Mo, Mi, Fr", "Tage als Text")
+let water = Habit(title: "Wasser", symbol: "drop")
+expect(water.isScheduled(on: day(2026, 10, 20)), true, "ohne Tage = jeden Tag")
+expect(water.daysText, "täglich", "täglich als Text")
+let oldHabit = try! JSONDecoder().decode(Habit.self, from: #"{"title":"Zähne","symbol":"sparkles","perDay":2}"#.data(using: .utf8)!)
+expect(oldHabit.days, [], "alte Gewohnheit: jeden Tag")
+let oddHabit = try! JSONDecoder().decode(Habit.self, from: #"{"title":"X","days":[0,2,9]}"#.data(using: .utf8)!)
+expect(oddHabit.days, [2], "kaputte Tage fliegen raus")
 
 if failures > 0 {
     print("\(failures) Logik-Test(s) fehlgeschlagen")

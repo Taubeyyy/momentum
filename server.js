@@ -764,8 +764,8 @@ const DOT_KINDS = ['task', 'reminder', 'shop', 'memo', 'focus', 'done', 'tomorro
 // Was Dot an der App ändern darf (kind „edit“, Feld key) – gleiche Liste wie DotEdit in der App
 const DOT_EDITS = ['morning.leave', 'morning.days', 'morning.add', 'morning.remove', 'evening.bed', 'evening.days',
   'evening.add', 'evening.remove', 'meals.times', 'nudges.window', 'reminder.time', 'reminder.delete', 'habit.add',
-  'habit.remove', 'habit.time', 'task.rename', 'task.delete', 'task.plan', 'task.time', 'shop.remove',
-  'timer.presets', 'snooze', 'theme', 'dot.name', 'memo.delete', 'chat.clear', 'shop.clear'];
+  'habit.remove', 'habit.time', 'habit.days', 'task.rename', 'task.delete', 'task.plan', 'task.time', 'shop.remove',
+  'timer.presets', 'snooze', 'theme', 'dot.name', 'memo.delete', 'memo.clear', 'chat.clear', 'shop.clear'];
 // Was Dot in der App einstellen darf (kind „setting“): title = einer davon, step = on/off
 const DOT_SETTINGS = ['morning', 'evening', 'nudges', 'meals', 'briefing', 'review', 'countdown', 'halfway'];
 

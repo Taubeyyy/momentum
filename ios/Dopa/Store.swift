@@ -271,6 +271,19 @@ final class Store: ObservableObject {
         syncMemoWidget()
     }
 
+    /// „Alle Notizen löschen“ (auf Wunsch über Dot). Heutige Erledigt-Einträge („Gegessen“) bleiben –
+    /// an ihnen hängen die Zähler von heute. Gibt zurück, wie viele weg sind.
+    @discardableResult
+    func clearMemos() -> Int {
+        let keep: (Memo) -> Bool = { $0.kind == .done && Calendar.current.isDateInToday($0.createdAt) }
+        let gone: [Memo] = data.memos.filter { !keep($0) }
+        for memo in gone { if let photo = memo.photo { MemoPhotos.delete(photo) } }
+        data.memos.removeAll { !keep($0) }
+        save()
+        syncMemoWidget()
+        return gone.count
+    }
+
     private func syncMemoWidget() {
         let latest = data.memos.first.map { "\($0.photo == nil ? $0.kind.emoji : "📷") \($0.text)" } ?? ""
         Shared.defaults?.set(latest, forKey: Shared.widgetTextKey)
@@ -1152,7 +1165,7 @@ final class Store: ObservableObject {
         if done > 0 { parts.append("\(done) erledigt") }
         if focusMinutesToday > 0 { parts.append("\(focusMinutesToday) Min Fokus") }
         if mealsToday > 0 { parts.append("\(mealsToday)× gegessen") }
-        let habitsDone = data.habits.filter { habitCount($0.id) >= $0.perDay }.count
+        let habitsDone = todayHabits.filter { habitCount($0.id) >= $0.perDay }.count
         if habitsDone > 0 { parts.append("\(habitsDone) \(habitsDone == 1 ? "Gewohnheit" : "Gewohnheiten")") }
         return parts.joined(separator: " · ")
     }
@@ -1172,7 +1185,7 @@ final class Store: ObservableObject {
         }
         if let one = theOne(on: day), one.doneAt == nil { facts.append("Das Eine: \(one.title)") }
         let today = Calendar.current.isDateInToday(day)
-        for h in data.habits where h.isMed && !(today && habitCount(h.id) >= h.perDay) {
+        for h in data.habits where h.isMed && h.isScheduled(on: day) && !(today && habitCount(h.id) >= h.perDay) {
             facts.append(h.remindAt.map { "\(h.title) um \(ClockTime.string($0))" } ?? h.title)
         }
         return facts
@@ -1403,6 +1416,9 @@ final class Store: ObservableObject {
             rescheduleReminders()
         }
     }
+
+    /// Gewohnheiten, die heute dran sind (an freien Wochentagen nicht).
+    var todayHabits: [Habit] { data.habits.filter { $0.isScheduled(on: Date()) } }
 
     func saveHabit(_ habit: Habit) {
         if let i = data.habits.firstIndex(where: { $0.id == habit.id }) {
@@ -1645,8 +1661,16 @@ final class Store: ObservableObject {
             deleteReminder(s.custom[i].id)
         case .habitAdd:
             guard !a.step.isEmpty else { return false }
+            let days: [Int] = DotEdit.weekdays(a.items)
             saveHabit(Habit(title: a.step, symbol: "checkmark", perDay: a.minutes > 0 ? min(12, a.minutes) : 1,
-                            remindAt: a.time))
+                            remindAt: a.time, days: days.count == 7 ? [] : days))
+        case .habitDays:
+            guard let i = DotChat.match(a.title, in: data.habits.map(\.title)) else { return missing() }
+            let days: [Int] = DotEdit.weekdays(a.items)
+            guard !days.isEmpty else { return false }
+            var habit = data.habits[i]
+            habit.days = days.count == 7 ? [] : days
+            saveHabit(habit)
         case .habitRemove:
             guard let i = DotChat.match(a.title, in: data.habits.map(\.title)) else { return missing() }
             deleteHabit(data.habits[i].id)
@@ -1697,6 +1721,9 @@ final class Store: ObservableObject {
         case .memoDelete:
             guard let i = DotChat.match(a.title, in: data.memos.map(\.text)) else { return missing() }
             deleteMemo(data.memos[i].id)
+        case .memoClear:
+            let count = clearMemos()
+            Toaster.shared.show(count == 0 ? "Keine Notizen zum Löschen" : "\(count) Notiz\(count == 1 ? "" : "en") gelöscht")
         case .chatClear:
             // erst nach dem Abhaken leeren – sonst verschwindet der Knopf, während er noch gedrückt wird
             Task { @MainActor in self.clearDotChat() }
@@ -1799,7 +1826,7 @@ final class Store: ObservableObject {
     /// Schlaf und Schritte holen. Schritte haken Gewohnheiten mit Schrittziel ab (sobald die App offen ist).
     func refreshHealth() async {
         guard !CommandLine.arguments.contains("-uitest") else { return }
-        let stepHabits = data.habits.filter { ($0.stepGoal ?? 0) > 0 }
+        let stepHabits = todayHabits.filter { ($0.stepGoal ?? 0) > 0 }
         guard data.reminders.sleepOn || !stepHabits.isEmpty else { return }
         await Health.shared.refresh(all: data.reminders.sleepOn, steps: !stepHabits.isEmpty)
         guard let steps = Health.shared.stepsToday else { return }
@@ -2053,7 +2080,10 @@ final class Store: ObservableObject {
         lines.append("Essens-Erinnerung um " + r.mealTimes.map { ClockTime.string($0) }.joined(separator: ", ")
                      + "; Stupser \(ClockTime.string(r.nudgeFrom))–\(ClockTime.string(r.nudgeTo)) alle \(r.nudgeEvery) Min"
                      + "; Timer-Knöpfe \(r.timerPresets.map { String($0) }.joined(separator: ", ")) Min; „Später“ \(r.snoozeMinutes) Min")
-        let habitList: [String] = data.habits.map { h in h.title + (h.remindAt.map { " (\(ClockTime.string($0)))" } ?? "") }
+        let habitList: [String] = data.habits.map { (h: Habit) -> String in
+            let at: String = h.remindAt.map { ", \(ClockTime.string($0))" } ?? ""
+            return "\(h.title) (\(h.daysText)\(at))"
+        }
         if !habitList.isEmpty { lines.append("Gewohnheiten: " + habitList.joined(separator: ", ")) }
         let customs: [String] = r.custom.prefix(15).map { "\($0.title) um \(ClockTime.string($0.minutes))" }
         if !customs.isEmpty { lines.append("Eigene Erinnerungen: " + customs.joined(separator: ", ")) }
@@ -2086,7 +2116,7 @@ final class Store: ObservableObject {
         if !later.isEmpty { lines.append("Später geplant: " + later.joined(separator: "; ")) }
         if !somedayTasks.isEmpty { lines.append("Irgendwann-Liste: \(somedayTasks.count) Sachen") }
 
-        let habits = data.habits.filter { habitCount($0.id) < $0.perDay }.map(\.title)
+        let habits = todayHabits.filter { habitCount($0.id) < $0.perDay }.map(\.title)
         if !habits.isEmpty { lines.append("Gewohnheiten heute noch offen: " + habits.joined(separator: ", ")) }
 
         let shop = shopOpen.prefix(20).map(\.name)

@@ -89,7 +89,7 @@ Auf dem Server gibt es kein Xcode und kein `gh` – Swift wird nur im CI gebaut.
 Edwin will **alle** Ideen, aber pro Session wenige, jedes Feature komplett durchdacht und fertig – nicht alles zu 10 %.
 Logik in `Shared/Fun.swift` (testbar), jedes Feature auch im Simulator-Rundgang antippen.
 
-1. ✅ Build 114: Dot zieht für dich (`DrawView.swift`), Verkleidungen (`DotOutfitView.swift`, Anprobe unter Profil → Farben),
+1. ✅ Build 115: Dot zieht für dich (`DrawView.swift`), Verkleidungen (`DotOutfitView.swift`, Anprobe unter Profil → Farben),
    Überraschungen nach dem Abhaken (`SurpriseView.swift`, max. 2/Tag, 30 Min Abstand).
 2. Widget, das sich täglich ändert: Dot mit Tages-Outfit + genau eine kleine Sache (Widget teilt `Outfit.today` über Shared).
 3. Dot arbeitet neben dir: während des Timers sitzt Dot mit Laptop daneben, optional Regen/Café-Geräusch (lokal, kein Stream).

@@ -214,14 +214,14 @@ struct DayView: View {
         }
 
         // Gewohnheiten mit Uhrzeit
-        for h in store.data.habits {
+        for h in store.data.habits where h.isScheduled(on: day) {
             guard let at = h.remindAt else { continue }
             let count = isToday ? store.habitCount(h.id) : 0
             let done = isToday && count >= h.perDay
             list.append(Entry(
                 id: "habit-\(h.id.uuidString)", minutes: at, time: ClockTime.string(at),
                 kicker: h.isMed ? "Tabletten" : "Gewohnheit", title: h.title,
-                detail: done ? "Abgehakt" : !isToday ? "Täglich" : h.perDay > 1 ? "\(count)/\(h.perDay)" : "Noch offen",
+                detail: done ? "Abgehakt" : !isToday ? (h.days.isEmpty ? "Täglich" : h.daysText) : h.perDay > 1 ? "\(count)/\(h.perDay)" : "Noch offen",
                 faded: done))
         }
 

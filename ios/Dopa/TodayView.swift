@@ -31,7 +31,7 @@ struct TodayView: View {
                     CheckInCard()
 
                     // Gewohnheiten ohne eigenen Kasten – eine ruhige Reihe
-                    if !store.data.habits.isEmpty {
+                    if !store.todayHabits.isEmpty {
                         HabitStrip(embedded: true)
                     }
 

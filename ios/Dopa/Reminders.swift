@@ -591,12 +591,25 @@ enum Reminders {
             guard let at = habit.remindAt else { continue }
             let category = habit.isMed ? Category.med : Category.habit
             let info = ["habit": habit.id.uuidString, "route": "jetzt"]
-            requests.append(daily("habit-\(habit.id.uuidString)", at: at, category: category,
-                                  title: habit.title, body: Texts.habit(habit), info: info))
+            if habit.days.isEmpty {
+                requests.append(daily("habit-\(habit.id.uuidString)", at: at, category: category,
+                                      title: habit.title, body: Texts.habit(habit), info: info))
+            } else {
+                // nur an den gewählten Wochentagen
+                for weekday in habit.days {
+                    var components = DateComponents()
+                    components.weekday = weekday
+                    components.hour = at / 60
+                    components.minute = at % 60
+                    requests.append(request("habit-\(habit.id.uuidString)-w\(weekday)", components, category: category,
+                                            title: habit.title, body: Texts.habit(habit), route: nil, info: info))
+                }
+            }
             guard ctx.settings.persistOn else { continue }
             for dayOffset in 0...1 {
                 if dayOffset == 0 && ctx.habitsDone.contains(habit.id) { continue }
                 guard let day = cal.date(byAdding: .day, value: dayOffset, to: Date()) else { continue }
+                guard habit.isScheduled(on: day, calendar: cal) else { continue }
                 let base = ClockTime.date(at, on: day)
                 for (index, offset) in ctx.settings.followUps.sorted().enumerated() {
                     let fire = base.addingTimeInterval(TimeInterval(offset * 60))

@@ -744,11 +744,13 @@ Vorschläge zum Antippen ("actions", höchstens 4, oft keine):
   morning.leave (time) · morning.days (items Wochentage: "Mo","Di"… oder "werktags"/"täglich") · morning.add (step = Schritt,
   minutes) · morning.remove (step = Schritt) · evening.bed (time) · evening.days · evening.add · evening.remove ·
   meals.times (items ["12:30","18:00"]) · nudges.window (items [von, bis], minutes = alle X Min) ·
-  reminder.time (title = Erinnerung, time) · reminder.delete (title) · habit.add (step = Name, time optional, minutes = pro Tag) ·
-  habit.remove (title) · habit.time (title, time; "" = ohne Erinnerung) · task.rename (title = alt, step = neu) ·
+  reminder.time (title = Erinnerung, time) · reminder.delete (title) · habit.add (step = Name, time optional, minutes = pro Tag,
+  items optional Wochentage wie bei morning.days) · habit.remove (title) · habit.time (title, time; "" = ohne Erinnerung) ·
+  habit.days (title, items Wochentage: "Mo","Mi" … / "werktags" / "täglich") · task.rename (title = alt, step = neu) ·
   task.delete (title) · task.plan (title, day; -1 = irgendwann) · task.time (title, time, day) · shop.remove (title) ·
   timer.presets (items ["5","15","25"]) · snooze (minutes) · theme (step = Name einer freien Farbe) · dot.name (step) ·
-  Löschen auf Wunsch: memo.delete (title = Text der Notiz aus „Letzte Notizen“) · chat.clear (unser Gespräch leeren) ·
+  Löschen auf Wunsch: memo.delete (title = Text der Notiz aus „Letzte Notizen“) · memo.clear (ALLE Notizen auf einmal –
+  bei „lösch alle/meine Notizen“ genau EIN memo.clear, nicht einzelne memo.delete) · chat.clear (unser Gespräch leeren) ·
   shop.clear (ganze Einkaufsliste leeren). Löschen nur, wenn die Person es ausdrücklich will.
   Bei title immer GENAU den Namen aus dem Kontext. Mehrere Änderungen = mehrere edit-Vorschläge (max. 4).
   Zum An-/Ausschalten und Pausieren weiter „setting“ nehmen.
