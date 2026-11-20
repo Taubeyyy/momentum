@@ -16,7 +16,9 @@ module.exports = function hub(app, { db, auth, express, str, clamp, RELEASE_DIR 
   // Projekte, an denen Claude arbeiten darf. ciDir: dort legt die CI ihre Ergebnisse ab.
   const PROJECTS = {
     dopa: { label: 'Dopa', repo: 'Taubeyyy/momentum', ciDir: RELEASE_DIR, ownFeedback: true },
-    fakester: { label: 'Fakester', repo: 'Taubeyyy/fakester-ios', ciDir: path.join(RELEASE_DIR, 'fakester') },
+    fakester: { label: 'Fakester', repo: 'Taubeyyy/fakester-ios', ciDir: path.join(RELEASE_DIR, 'fakester'), ipa: 'Fakester.ipa' },
+    // seit 2026-11-19: die Taubey-Hub-App (Farm-Dashboard fürs Handy) – nur Edwins eigenes Feedback
+    taubey: { label: 'Taubey', repo: 'Taubeyyy/taubey-hub-ios', ciDir: path.join(RELEASE_DIR, 'taubey'), ipa: 'Taubey.ipa' },
   };
   // Wo die neueste .ipa liegt (für „Installieren“ in der Claude-App, per TrollStore)
   function installUrl(project, build) {
@@ -27,7 +29,7 @@ module.exports = function hub(app, { db, auth, express, str, clamp, RELEASE_DIR 
       return token && fs.existsSync(path.join(RELEASE_DIR, `Dopa-${build.run}.ipa`)) ? `https://${host}/dl/${token}/Dopa-${build.run}.ipa` : null;
     }
     // öffentliche Repos: die .ipa hängt am GitHub-Release build-<N>
-    return `https://github.com/${PROJECTS[project].repo}/releases/download/build-${build.run}/Fakester.ipa`;
+    return `https://github.com/${PROJECTS[project].repo}/releases/download/build-${build.run}/${PROJECTS[project].ipa || 'Fakester.ipa'}`;
   }
   const projectOf = id => (Object.prototype.hasOwnProperty.call(PROJECTS, id) ? PROJECTS[id] : null);
 

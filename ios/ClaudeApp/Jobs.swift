@@ -105,6 +105,7 @@ struct JobView: View {
     private var projectLabel: String {
         switch job?.project {
         case "fakester": return "Fakester"
+        case "taubey": return "Taubey"
         case "dopa": return "Dopa"
         default: return "Auftrag"
         }

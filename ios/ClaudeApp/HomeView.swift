@@ -190,11 +190,11 @@ private struct ProjectRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: project.id == "fakester" ? "music.note" : "brain.head.profile")
+            Image(systemName: projectIcon)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(project.id == "fakester" ? Color.pink : Color.purple, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(projectColor, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(project.label).font(.headline)
                 Text(buildLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -209,6 +209,22 @@ private struct ProjectRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var projectIcon: String {
+        switch project.id {
+        case "fakester": return "music.note"
+        case "taubey": return "fish.fill"
+        default: return "brain.head.profile"
+        }
+    }
+
+    private var projectColor: Color {
+        switch project.id {
+        case "fakester": return Color.pink
+        case "taubey": return Color(red: 0.76, green: 0.12, blue: 0.70)
+        default: return Color.purple
+        }
     }
 
     private var buildLine: String {

@@ -4,15 +4,16 @@
      dopa-ci              letzter Build + Simulator-Rundgang (bei Fehlern mit Auszug aus dem Protokoll)
      dopa-ci --wait       wartet auf den nächsten Lauf (max. 9 Min, dann nochmal aufrufen)
      dopa-ci --wait 41    wartet, bis Lauf 41 fertig ist
-     dopa-ci --project fakester [--wait]   dasselbe für die Fakester-App (ohne Simulator-Rundgang)      */
+     dopa-ci --project fakester [--wait]   dasselbe für die Fakester-App (ohne Simulator-Rundgang)
+     dopa-ci --project taubey [--wait]     dasselbe für die Taubey-Hub-App (mit Simulator-Rundgang)      */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const argv = process.argv.slice(2);
 const pi = argv.indexOf('--project');
 const PROJECT = pi >= 0 ? argv.splice(pi, 2)[1] : 'dopa';
-if (!['dopa', 'fakester'].includes(PROJECT)) { console.log('Unbekanntes Projekt: ' + PROJECT); process.exit(1); }
-const HAS_UI = PROJECT === 'dopa';
+if (!['dopa', 'fakester', 'taubey'].includes(PROJECT)) { console.log('Unbekanntes Projekt: ' + PROJECT); process.exit(1); }
+const HAS_UI = PROJECT === 'dopa' || PROJECT === 'taubey';
 const DIR = '/var/www/momentum/releases' + (PROJECT === 'dopa' ? '' : '/' + PROJECT);
 
 const json = f => { try { return JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')); } catch { return null; } };

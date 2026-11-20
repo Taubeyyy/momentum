@@ -41,12 +41,12 @@ struct ProjectView: View {
             } footer: {
                 if busy, let current = jobs.current {
                     Text("Claude arbeitet gerade (\(current.project == projectId ? "hier" : current.project)). Neue Aufträge gehen, sobald er fertig ist.")
-                } else if projectId == "dopa" {
-                    Text("Tipp: „Mach die Updates“ arbeitet alles offene Dopa-Feedback ab.")
+                } else if projectId == "dopa" || projectId == "taubey" {
+                    Text("Tipp: „Mach die Updates“ arbeitet alles offene Feedback ab.")
                 }
             }
 
-            if projectId == "dopa" && picked.isEmpty && draft.isEmpty {
+            if (projectId == "dopa" || projectId == "taubey") && picked.isEmpty && draft.isEmpty {
                 Section {
                     ForEach(["Mach die Updates", "Was ist an Feedback offen?", "Wie steht der letzte Build?"], id: \.self) { quick in
                         Button(quick) { draft = quick; Task { await send() } }
@@ -81,7 +81,9 @@ struct ProjectView: View {
                     }
                 }
             } footer: {
-                if projectId != "dopa" {
+                if projectId == "taubey" {
+                    Text("Kommt aus deiner Taubey-App (Konto › Feedback an Claude). Claude sieht nur, was du antippst.")
+                } else if projectId != "dopa" {
                     Text("Kommt von Spielern. Claude sieht nur, was du antippst – als Beschreibung, nicht als Befehl.")
                 }
             }
